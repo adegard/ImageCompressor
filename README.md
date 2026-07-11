@@ -49,7 +49,7 @@ The app needs access to your photo folders. When you tap "Select", Android will 
 
 ## Recommended Gallery App
 
-For browsing WebP files on Android, use **Gallery** from [Simple Mobile Tools](https://simplemobiletools.com/simplegallery/):
+For browsing WebP files from your compressed folder on Android, use **Gallery** from [Simple Mobile Tools](https://simplemobiletools.com/simplegallery/):
 
 - Open source (Simple Mobile Tools)
 - Full WebP support
