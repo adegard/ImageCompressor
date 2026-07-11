@@ -39,17 +39,7 @@ A typical camera roll of **10 GB** can be reduced to around **1 GB** using WebP 
 
 ## Install
 
-### From source
-
-```bash
-git clone https://github.com/adegard/ImageCompressor.git
-cd ImageCompressor
-./gradlew assembleDebug
-```
-
-The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
-
-Or download the latest build from the [Actions](https://github.com/adegard/ImageCompressor/actions) tab → Artifacts.
+Download the latest APK from the [Releases](https://github.com/adegard/ImageCompressor/releases) page, install it on your Android device, and grant the requested folder permissions when prompted.
 
 ### Permissions
 
