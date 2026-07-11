@@ -82,7 +82,7 @@ class CompressService : Service() {
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_compress)
+            .setSmallIcon(android.R.drawable.ic_menu_save)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
