@@ -2,7 +2,7 @@
 
 A simple Android app that compresses your photos from JPG/PNG to WebP format, freeing up massive storage space on your device — without losing quality and without paying for cloud subscriptions.
 
-![Screenshot](screen.jpg?raw=true "Screenshot")
+![Screenshot](Screenshot_20260711-192514.png?raw=true "Screenshot")
 
 ## Why?
 
