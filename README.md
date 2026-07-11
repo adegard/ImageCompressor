@@ -2,6 +2,8 @@
 
 A simple Android app that compresses your photos from JPG/PNG to WebP format, freeing up massive storage space on your device — without losing quality and without paying for cloud subscriptions.
 
+![Screenshot](screen.jpg?raw=true "Screenshot")
+
 ## Why?
 
 Cloud-based photo services like Google Photos require paid subscriptions for full-quality storage. This app keeps all your photos **on your own device**, compressed to a fraction of the size, so you never depend on a monthly fee or an internet connection.
