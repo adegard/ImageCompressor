@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.ImageCompressor" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorSeed">@color/seed</item>
+        <item name="colorPrimary">#FF6750A4</item>
+        <item name="colorOnPrimary">#FFFFFFFF</item>
+        <item name="colorPrimaryContainer">#FFEADDFF</item>
+        <item name="colorOnPrimaryContainer">#FF21005D</item>
+        <item name="colorSecondary">#FF625B71</item>
+        <item name="colorOnSecondary">#FFFFFFFF</item>
+        <item name="colorSecondaryContainer">#FFE8DEF8</item>
+        <item name="colorOnSecondaryContainer">#FF1D192B</item>
+        <item name="colorTertiary">#FF7D5260</item>
+        <item name="colorError">#FFB3261E</item>
     </style>
 </resources>
