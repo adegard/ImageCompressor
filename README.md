@@ -27,9 +27,9 @@ A typical camera roll of **10 GB** can be reduced to around **1 GB** using WebP 
 ## How it works
 
 1. **Select three folders** using Android's folder picker:
-   - **Source** — folder containing photos to compress (e.g. `DCIM/Camera`)
+   - **Source** — folder containing photos to compress, tipically camera folder (e.g. `DCIM/Camera`)
    - **Temp** — where compressed WebP files are written first
-   - **Final** — where files are moved after successful compression
+   - **Final** — where files are moved after successful compression (your compressed gallery folder)
 
 2. **Adjust settings** (optional):
    - Quality: 1–100 (default 65 — good balance of size and quality)
