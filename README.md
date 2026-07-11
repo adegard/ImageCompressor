@@ -6,7 +6,7 @@ A simple Android app that compresses your photos from JPG/PNG to WebP format, fr
 
 ## Why?
 
-Cloud-based photo services like Google Photos require paid subscriptions for full-quality storage. This app keeps all your photos **on your own device**, compressed to a fraction of the size, so you never depend on a monthly fee or an internet connection.
+Cloud-based photo services like Google Photos require paid subscriptions for full-quality storage. This app keeps all your photos **on your own device**, compressed to a fraction of the size, so you never depend on a monthly fee or an internet connection, for your whole life!
 
 A typical camera roll of **10 GB** can be reduced to around **1 GB** using WebP compression — with virtually no visible quality loss.
 
