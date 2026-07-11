@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Image Compressor</string>
+    <string name="subtitle">Compress JPG/PNG to WebP and move to final folder</string>
+    <string name="label_source">Source folder (photos to compress)</string>
+    <string name="label_tmp">Temp folder (compressed files)</string>
+    <string name="label_final">Final folder (move destination)</string>
+    <string name="not_set">Not set — tap to select</string>
+    <string name="select_folder">Select</string>
+    <string name="quality">Quality (1-100)</string>
+    <string name="max_res">Max resolution</string>
+    <string name="start_compression">Start compression</string>
+    <string name="compressing">Compressing…</string>
+    <string name="done">Done! Compressed %1$d files, %2$d errors</string>
+    <string name="notification_channel">Compression progress</string>
+    <string name="notification_title">Compressing photos…</string>
+    <string name="error_no_source">Source folder not set</string>
+</resources>
