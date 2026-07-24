@@ -45,14 +45,15 @@ class GalleryActivity : AppCompatActivity() {
         pathStack.add(PathSegment(getString(R.string.gallery_title), rootUri))
         loadCurrentLevel()
 
-        @Suppress("DEPRECATION")
-        onBackPressedDispatcher.addCallback(this) {
-            if (pathStack.size > 1) {
-                pathStack.removeLast()
-                loadCurrentLevel()
-            } else {
-                finish()
-            }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (pathStack.size > 1) {
+            pathStack.removeLast()
+            loadCurrentLevel()
+        } else {
+            super.onBackPressed()
         }
     }
 

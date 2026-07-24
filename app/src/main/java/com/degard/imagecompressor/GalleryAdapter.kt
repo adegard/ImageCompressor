@@ -75,7 +75,6 @@ class GalleryAdapter(
     inner class ImageVH(private val b: GalleryItemBinding) : RecyclerView.ViewHolder(b.root) {
         fun bind(entry: ImageEntry) {
             b.tvFileName.text = entry.name
-            b.tvFolderPath.visibility = View.GONE
             b.ivThumb.setImageBitmap(null)
             b.ivThumb.tag = entry.uri
 

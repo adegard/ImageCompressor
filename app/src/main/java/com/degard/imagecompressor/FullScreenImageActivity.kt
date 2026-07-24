@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
-import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.degard.imagecompressor.databinding.ActivityFullscreenBinding
 
@@ -100,13 +99,14 @@ class FullScreenImageActivity : AppCompatActivity() {
         val current = rotations[currentPosition] ?: 0f
         rotations[currentPosition] = current + 90f
 
-        val holder = findViewHolderForPosition(currentPosition)
-        holder?.itemView?.findViewById<ImageView>(R.id.ivFull)?.rotation = current + 90f
-    }
-
-    private fun findViewHolderForPosition(position: Int): RecyclerView.ViewHolder? {
-        return binding.viewPager.findViewById<RecyclerView>(R.id.recycler_view)
-            ?.findViewHolderForAdapterPosition(position)
+        for (i in 0 until binding.viewPager.childCount) {
+            val child = binding.viewPager.getChildAt(i)
+            val iv = child.findViewById<ImageView>(R.id.ivFull)
+            if (iv != null) {
+                iv.rotation = current + 90f
+                break
+            }
+        }
     }
 
     private fun saveRotation(uri: Uri, degrees: Float) {
