@@ -238,6 +238,19 @@
             app:cornerRadius="12dp"
             xmlns:app="http://schemas.android.com/apk/res-auto" />
 
+        <!-- View compressed button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnViewCompressed"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/view_compressed"
+            android:textSize="16sp"
+            android:enabled="false"
+            app:cornerRadius="12dp"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            xmlns:app="http://schemas.android.com/apk/res-auto" />
+
     </LinearLayout>
 
 </ScrollView>

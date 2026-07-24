@@ -25,6 +25,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".GalleryActivity"
+            android:exported="false" />
+
         <service
             android:name=".CompressService"
             android:foregroundServiceType="dataSync"

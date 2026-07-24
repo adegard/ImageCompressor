@@ -74,6 +74,15 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnStart.setOnClickListener { startCompression() }
 
+        binding.btnViewCompressed.setOnClickListener {
+            val finalUri = prefs.finalUri
+            if (finalUri != null) {
+                val intent = Intent(this, GalleryActivity::class.java)
+                intent.putExtra("folder_uri", finalUri.toString())
+                startActivity(intent)
+            }
+        }
+
         updateUI()
     }
 
@@ -93,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         binding.tvFinalPath.text = prefs.finalUri?.toString() ?: getString(R.string.not_set)
 
         binding.btnStart.isEnabled = prefs.sourceUri != null && prefs.tmpUri != null && prefs.finalUri != null
+        binding.btnViewCompressed.isEnabled = prefs.finalUri != null
     }
 
     private fun startCompression() {

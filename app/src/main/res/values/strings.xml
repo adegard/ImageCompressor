@@ -15,4 +15,8 @@
     <string name="notification_channel">Compression progress</string>
     <string name="notification_title">Compressing photos…</string>
     <string name="error_no_source">Source folder not set</string>
+    <string name="view_compressed">View compressed</string>
+    <string name="gallery_title">Compressed photos</string>
+    <string name="gallery_empty">No compressed photos found</string>
+    <string name="gallery_loading">Loading photos…</string>
 </resources>
