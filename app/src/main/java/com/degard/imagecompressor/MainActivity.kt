@@ -42,6 +42,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val pickGalleryRoot = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let {
+            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            prefs.galleryRootUri = it
+            updateUI()
+        }
+    }
+
     private val doneReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val compressed = intent.getIntExtra("compressed", 0)
@@ -68,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnSelectSource.setOnClickListener { pickSource.launch(null) }
         binding.btnSelectTmp.setOnClickListener { pickTmp.launch(null) }
         binding.btnSelectFinal.setOnClickListener { pickFinal.launch(null) }
+        binding.btnSelectGalleryRoot.setOnClickListener { pickGalleryRoot.launch(null) }
 
         binding.etQuality.setText(prefs.quality.toString())
         binding.etMaxRes.setText(prefs.maxRes.toString())
@@ -75,10 +84,10 @@ class MainActivity : AppCompatActivity() {
         binding.btnStart.setOnClickListener { startCompression() }
 
         binding.btnViewCompressed.setOnClickListener {
-            val finalUri = prefs.finalUri
-            if (finalUri != null) {
+            val galleryRoot = prefs.galleryRootUri
+            if (galleryRoot != null) {
                 val intent = Intent(this, GalleryActivity::class.java)
-                intent.putExtra("folder_uri", finalUri.toString())
+                intent.putExtra("folder_uri", galleryRoot.toString())
                 startActivity(intent)
             }
         }
@@ -100,9 +109,10 @@ class MainActivity : AppCompatActivity() {
         binding.tvSourcePath.text = prefs.sourceUri?.toString() ?: getString(R.string.not_set)
         binding.tvTmpPath.text = prefs.tmpUri?.toString() ?: getString(R.string.not_set)
         binding.tvFinalPath.text = prefs.finalUri?.toString() ?: getString(R.string.not_set)
+        binding.tvGalleryRootPath.text = prefs.galleryRootUri?.toString() ?: getString(R.string.not_set)
 
         binding.btnStart.isEnabled = prefs.sourceUri != null && prefs.tmpUri != null && prefs.finalUri != null
-        binding.btnViewCompressed.isEnabled = prefs.finalUri != null
+        binding.btnViewCompressed.isEnabled = prefs.galleryRootUri != null
     }
 
     private fun startCompression() {

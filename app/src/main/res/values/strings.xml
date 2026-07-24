@@ -17,6 +17,14 @@
     <string name="error_no_source">Source folder not set</string>
     <string name="view_compressed">View compressed</string>
     <string name="gallery_title">Compressed photos</string>
-    <string name="gallery_empty">No compressed photos found</string>
-    <string name="gallery_loading">Loading photos…</string>
+    <string name="gallery_empty">No photos found</string>
+    <string name="gallery_loading">Loading…</string>
+    <string name="label_gallery_root">Gallery root folder (for viewing)</string>
+    <string name="gallery_subfolder_count">%d photos</string>
+    <string name="rotate">Rotate</string>
+    <string name="delete">Delete</string>
+    <string name="confirm_delete_title">Delete photo</string>
+    <string name="confirm_delete_msg">Delete this photo permanently?</string>
+    <string name="cancel">Cancel</string>
+    <string name="error_no_gallery_root">Select a gallery root folder first</string>
 </resources>

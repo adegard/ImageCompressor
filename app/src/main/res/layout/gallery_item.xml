@@ -5,7 +5,8 @@
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
     app:cardCornerRadius="8dp"
-    app:cardElevation="1dp">
+    app:cardElevation="1dp"
+    app:strokeWidth="0dp">
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -30,20 +31,6 @@
             android:ellipsize="end"
             android:paddingHorizontal="6dp"
             android:paddingVertical="3dp" />
-
-        <TextView
-            android:id="@+id/tvFolderPath"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:background="#66000000"
-            android:textColor="@android:color/white"
-            android:textSize="9sp"
-            android:maxLines="1"
-            android:ellipsize="start"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="2dp"
-            android:visibility="gone" />
 
     </FrameLayout>
 

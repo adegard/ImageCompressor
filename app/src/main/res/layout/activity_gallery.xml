@@ -3,7 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
@@ -12,16 +13,24 @@
         app:title="@string/gallery_title"
         app:navigationIcon="?attr/homeAsUpIndicator" />
 
-    <TextView
-        android:id="@+id/tvGalleryStatus"
+    <HorizontalScrollView
+        android:id="@+id/breadcrumbScroll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/gallery_loading"
-        android:textSize="13sp"
-        android:textColor="?android:textColorSecondary"
-        android:gravity="center"
-        android:padding="16dp"
-        android:visibility="gone" />
+        android:scrollbars="none"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:visibility="gone"
+        android:background="?attr/colorSurfaceVariant">
+
+        <LinearLayout
+            android:id="@+id/breadcrumb"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical" />
+
+    </HorizontalScrollView>
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -41,6 +50,16 @@
             android:layout_height="wrap_content"
             android:layout_gravity="top"
             android:indeterminate="true" />
+
+        <TextView
+            android:id="@+id/tvEmpty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/gallery_empty"
+            android:textSize="15sp"
+            android:textColor="?android:textColorSecondary"
+            android:visibility="gone" />
 
     </FrameLayout>
 

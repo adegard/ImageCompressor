@@ -25,4 +25,8 @@ class Prefs(context: Context) {
     var maxRes: Int
         get() = prefs.getInt("maxres", 1280)
         set(value) = prefs.edit().putInt("maxres", value).apply()
+
+    var galleryRootUri: Uri?
+        get() = prefs.getString("gallery_root", null)?.let { Uri.parse(it) }
+        set(value) = prefs.edit().putString("gallery_root", value?.toString()).apply()
 }
