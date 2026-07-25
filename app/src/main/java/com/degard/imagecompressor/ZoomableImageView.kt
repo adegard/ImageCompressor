@@ -22,7 +22,7 @@ class ZoomableImageView @JvmOverloads constructor(
 
     private var mode = NONE
     private val startPoint = PointF()
-    private val midPoint = PointF()
+    private var midPoint = PointF()
     private var oldDist = 1f
 
     private var minScale = 1f
