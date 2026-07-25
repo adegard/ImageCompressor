@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ImageCompressor" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#FFD0BCFF</item>
+        <item name="colorOnPrimary">#FF381E72</item>
+        <item name="colorPrimaryContainer">#FF4F378B</item>
+        <item name="colorOnPrimaryContainer">#FFEADDFF</item>
+        <item name="colorSecondary">#CCC2DC</item>
+        <item name="colorOnSecondary">#FF332D41</item>
+        <item name="colorSecondaryContainer">#FF4A4458</item>
+        <item name="colorOnSecondaryContainer">#FFE8DEF8</item>
+        <item name="colorTertiary">#EFB8C8</item>
+        <item name="colorError">#F2B8B5</item>
+    </style>
+</resources>

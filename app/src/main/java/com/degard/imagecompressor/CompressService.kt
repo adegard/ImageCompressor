@@ -9,7 +9,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import androidx.documentfile.provider.DocumentFile
+import java.io.File
 
 class CompressService : Service() {
 
@@ -22,14 +22,16 @@ class CompressService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val srcStr = intent?.getStringExtra("src") ?: return stopSelf().let { START_NOT_STICKY }
-        val tmpStr = intent.getStringExtra("tmp") ?: return stopSelf().let { START_NOT_STICKY }
         val finalStr = intent.getStringExtra("final") ?: return stopSelf().let { START_NOT_STICKY }
         val quality = intent.getIntExtra("quality", 65)
         val maxRes = intent.getIntExtra("maxres", 1280)
 
         val srcUri = Uri.parse(srcStr)
-        val tmpUri = Uri.parse(tmpStr)
         val finalUri = Uri.parse(finalStr)
+
+        val tmpDir = File(cacheDir, "compress_tmp")
+        tmpDir.deleteRecursively()
+        tmpDir.mkdirs()
 
         startForeground(1, buildNotification("Starting…"))
 
@@ -37,7 +39,7 @@ class CompressService : Service() {
             val result = ImageCompressor.compress(
                 context = this,
                 sourceUri = srcUri,
-                tmpUri = tmpUri,
+                tmpDir = tmpDir,
                 finalUri = finalUri,
                 quality = quality,
                 maxRes = maxRes
@@ -45,10 +47,11 @@ class CompressService : Service() {
                 updateNotification(status)
             }
 
+            tmpDir.deleteRecursively()
+
             val nm = getSystemService(NotificationManager::class.java)
             nm.notify(1, buildNotification("Done! ${result.compressed} compressed, ${result.errors} errors"))
 
-            // Send result broadcast
             val broadcast = Intent("com.degard.imagecompressor.DONE").apply {
                 putExtra("compressed", result.compressed)
                 putExtra("errors", result.errors)

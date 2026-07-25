@@ -11,7 +11,8 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         app:title="@string/app_name"
-        app:menu="@menu/menu_main" />
+        app:menu="@menu/menu_main"
+        app:menuIconTint="?attr/colorControlNormal" />
 
     <HorizontalScrollView
         android:id="@+id/breadcrumbScroll"
@@ -75,7 +76,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:text="@string/open_settings"
-                style="@style/Widget.Material3.Button.TonalButton" />
+                style="@style/Widget.Material3.Button" />
 
         </LinearLayout>
 

@@ -8,6 +8,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import androidx.exifinterface.media.ExifInterface
+import java.io.File
 
 object ImageCompressor {
 
@@ -18,15 +19,15 @@ object ImageCompressor {
     fun compress(
         context: Context,
         sourceUri: Uri,
-        tmpUri: Uri,
+        tmpDir: File,
         finalUri: Uri,
         quality: Int,
         maxRes: Int,
         onProgress: (String) -> Unit = {}
     ): Result {
+        tmpDir.mkdirs()
+
         val srcDoc = DocumentFile.fromTreeUri(context, sourceUri)
-            ?: return Result(0, 0, 0)
-        val tmpDoc = DocumentFile.fromTreeUri(context, tmpUri)
             ?: return Result(0, 0, 0)
         val finalDoc = DocumentFile.fromTreeUri(context, finalUri)
             ?: return Result(0, 0, 0)
@@ -49,8 +50,7 @@ object ImageCompressor {
 
                 val outName = "${name.substringBeforeLast('.')}.webp"
 
-                // Skip if already compressed in tmp
-                if (tmpDoc.findFile(outName) != null) {
+                if (File(tmpDir, outName).exists()) {
                     skipped++
                     return@forEach
                 }
@@ -63,18 +63,12 @@ object ImageCompressor {
                         return@forEach
                     }
 
-                    val outFile = tmpDoc.createFile("image/webp", outName)
-                        ?: run {
-                            errors++
-                            return@forEach
-                        }
-
-                    context.contentResolver.openOutputStream(outFile.uri)?.use { out ->
+                    val outFile = File(tmpDir, outName)
+                    outFile.outputStream().use { out ->
                         bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, quality, out)
                     }
                     bitmap.recycle()
 
-                    // Delete original on success
                     file.delete()
                     compressed++
                 } catch (e: Exception) {
@@ -86,28 +80,25 @@ object ImageCompressor {
 
         walkDir(srcDoc)
 
-        // Move from tmp to final
         onProgress("Moving to final folder…")
-        moveFiles(context, tmpDoc, finalDoc)
+        moveFiles(context, tmpDir, finalDoc)
 
         return Result(compressed, errors, skipped)
     }
 
-    private fun moveFiles(context: Context, src: DocumentFile, dst: DocumentFile) {
+    private fun moveFiles(context: Context, src: File, dst: DocumentFile) {
         src.listFiles().forEach { file ->
             if (file.isDirectory) {
-                val subDir = dst.createDirectory(file.name ?: "sub") ?: return@forEach
+                val subDir = dst.createDirectory(file.name) ?: return@forEach
                 moveFiles(context, file, subDir)
                 return@forEach
             }
 
-            val name = file.name ?: return@forEach
-            val newFile = dst.createFile("image/webp", name.substringBeforeLast('.')) ?: return@forEach
+            val name = file.nameWithoutExtension
+            val newFile = dst.createFile("image/webp", name) ?: return@forEach
 
-            context.contentResolver.openInputStream(file.uri)?.use { input ->
-                context.contentResolver.openOutputStream(newFile.uri)?.use { output ->
-                    input.copyTo(output)
-                }
+            context.contentResolver.openOutputStream(newFile.uri)?.use { output ->
+                file.inputStream().use { input -> input.copyTo(output) }
             }
             file.delete()
         }
@@ -135,7 +126,6 @@ object ImageCompressor {
             BitmapFactory.decodeStream(it, null, decodeOptions)
         } ?: return null
 
-        // Handle EXIF rotation
         return try {
             resolver.openInputStream(uri)?.use { stream ->
                 val exif = ExifInterface(stream)

@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.GridLayoutManager
 import com.degard.imagecompressor.databinding.ActivityMainBinding
+import com.google.android.material.color.MaterialColors
 
 class MainActivity : AppCompatActivity() {
 
@@ -52,6 +53,9 @@ class MainActivity : AppCompatActivity() {
         if (newRoot != rootUri) {
             rootUri = newRoot
             pathStack.clear()
+            FolderCache.invalidateAll()
+        } else if (pathStack.isNotEmpty()) {
+            FolderCache.invalidate(pathStack.last().uri)
         }
 
         if (rootUri != null) {
@@ -84,25 +88,40 @@ class MainActivity : AppCompatActivity() {
         binding.toolbar.title = pathStack.last().name
 
         Thread {
-            val doc = DocumentFile.fromTreeUri(this, uri)
-            val folders = mutableListOf<GalleryAdapter.FolderEntry>()
-            val images = mutableListOf<GalleryAdapter.ImageEntry>()
-            var imgIndex = 0
+            val cached = FolderCache.get(uri)
+            val entries: List<FolderCache.CachedEntry>
 
-            doc?.listFiles()?.forEach { file ->
-                if (file.isDirectory) {
+            if (cached != null) {
+                entries = cached
+            } else {
+                val doc = DocumentFile.fromTreeUri(this, uri)
+                val result = mutableListOf<FolderCache.CachedEntry>()
+
+                doc?.listFiles()?.forEach { file ->
                     val name = file.name ?: return@forEach
-                    val count = countImagesRecursive(file)
-                    if (count > 0) {
-                        folders.add(GalleryAdapter.FolderEntry(name, file.uri, count))
-                    }
-                } else {
-                    val name = file.name ?: return@forEach
-                    val ext = name.substringAfterLast('.', "").lowercase()
-                    if (ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")) {
-                        images.add(GalleryAdapter.ImageEntry(file.uri, name, imgIndex++))
+                    if (file.isDirectory) {
+                        val count = countImagesRecursive(file)
+                        result.add(FolderCache.CachedEntry(name, file.uri.toString(), true, count))
+                    } else {
+                        val ext = name.substringAfterLast('.', "").lowercase()
+                        if (ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")) {
+                            result.add(FolderCache.CachedEntry(name, file.uri.toString(), false))
+                        }
                     }
                 }
+
+                FolderCache.put(uri, result)
+                entries = result
+            }
+
+            val folders = entries
+                .filter { it.isDirectory && it.imageCount > 0 }
+                .map { GalleryAdapter.FolderEntry(it.name, Uri.parse(it.uri), it.imageCount) }
+
+            val images = mutableListOf<GalleryAdapter.ImageEntry>()
+            var imgIndex = 0
+            entries.filter { !it.isDirectory }.forEach {
+                images.add(GalleryAdapter.ImageEntry(Uri.parse(it.uri), it.name, imgIndex++))
             }
 
             runOnUiThread {
@@ -162,6 +181,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.breadcrumbScroll.visibility = View.VISIBLE
 
+        val activeColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE)
+        val inactiveColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.GRAY)
+
         for (i in pathStack.indices) {
             if (i > 0) {
                 val sep = TextView(this).apply {
@@ -178,7 +200,7 @@ class MainActivity : AppCompatActivity() {
                 textSize = 13f
                 isAllCaps = i == 0
                 setPadding(8, 4, 8, 4)
-                setTextColor(getColor(if (i == pathStack.lastIndex) android.R.color.white else android.R.color.darker_gray))
+                setTextColor(if (i == pathStack.lastIndex) activeColor else inactiveColor)
                 if (i < pathStack.lastIndex) {
                     setOnClickListener {
                         while (pathStack.size > i + 1) pathStack.removeLast()
