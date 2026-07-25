@@ -64,6 +64,12 @@ class MainActivity : AppCompatActivity() {
         if (pathStack.isNotEmpty()) {
             FolderCache.invalidate(pathStack.last().uri)
             loadCurrentLevel()
+        } else {
+            val savedUri = Prefs(this).galleryRootUri
+            if (savedUri != null) {
+                pathStack.add(PathEntry(savedUri, getString(R.string.gallery_title)))
+                loadCurrentLevel()
+            }
         }
     }
 
