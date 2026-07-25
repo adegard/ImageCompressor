@@ -17,7 +17,7 @@ A 10 GB camera roll can shrink to ~1 GB with virtually no visible quality loss.
 ## How to use
 
 1. Set a **gallery root folder** to browse your photos
-2. In **Settings**, select a **source** folder (e.g. `DCIM/Camera`) and a **final** folder
+2. In **Settings**, select a **source** folder (e.g. `DCIM/Camera`) and a **final** folder (current monthly folder inside gallery eg. 2026-07)
 3. Adjust quality (default 65) and max resolution (default 1280px) if needed
 4. Tap **Start** — compression runs in the background
 
