@@ -1,147 +1,196 @@
 package com.degard.imagecompressor
 
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
+import androidx.recyclerview.widget.GridLayoutManager
 import com.degard.imagecompressor.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var prefs: Prefs
+    private lateinit var adapter: GalleryAdapter
+    private var rootUri: Uri? = null
 
-    private val pickSource = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        uri?.let {
-            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            prefs.sourceUri = it
-            updateUI()
-        }
-    }
-
-    private val pickTmp = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        uri?.let {
-            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            prefs.tmpUri = it
-            updateUI()
-        }
-    }
-
-    private val pickFinal = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        uri?.let {
-            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            prefs.finalUri = it
-            updateUI()
-        }
-    }
-
-    private val pickGalleryRoot = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        uri?.let {
-            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            prefs.galleryRootUri = it
-            updateUI()
-        }
-    }
-
-    private val doneReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val compressed = intent.getIntExtra("compressed", 0)
-            val errors = intent.getIntExtra("errors", 0)
-            val skipped = intent.getIntExtra("skipped", 0)
-
-            binding.progressBar.visibility = View.GONE
-            binding.btnStart.isEnabled = true
-            binding.tvStatus.text = getString(R.string.done, compressed, errors)
-
-            if (errors > 0) {
-                Toast.makeText(this@MainActivity, "Completed with $errors errors", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
+    private data class PathSegment(val name: String, val uri: Uri)
+    private val pathStack = mutableListOf<PathSegment>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        prefs = Prefs(this)
+        adapter = GalleryAdapter(
+            onFolderClick = { folder -> navigateInto(folder) },
+            onImageClick = { index -> openFullScreen(index) }
+        )
 
-        binding.btnSelectSource.setOnClickListener { pickSource.launch(null) }
-        binding.btnSelectTmp.setOnClickListener { pickTmp.launch(null) }
-        binding.btnSelectFinal.setOnClickListener { pickFinal.launch(null) }
-        binding.btnSelectGalleryRoot.setOnClickListener { pickGalleryRoot.launch(null) }
+        binding.rvGallery.layoutManager = GridLayoutManager(this, 3)
+        binding.rvGallery.adapter = adapter
 
-        binding.etQuality.setText(prefs.quality.toString())
-        binding.etMaxRes.setText(prefs.maxRes.toString())
-
-        binding.btnStart.setOnClickListener { startCompression() }
-
-        binding.btnViewCompressed.setOnClickListener {
-            val galleryRoot = prefs.galleryRootUri
-            if (galleryRoot != null) {
-                val intent = Intent(this, GalleryActivity::class.java)
-                intent.putExtra("folder_uri", galleryRoot.toString())
-                startActivity(intent)
-            }
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.action_settings) {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            } else false
         }
 
-        updateUI()
+        binding.btnOpenSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        registerReceiver(doneReceiver, IntentFilter("com.degard.imagecompressor.DONE"), RECEIVER_NOT_EXPORTED)
+        val prefs = Prefs(this)
+        val newRoot = prefs.galleryRootUri
+
+        if (newRoot != rootUri) {
+            rootUri = newRoot
+            pathStack.clear()
+        }
+
+        if (rootUri != null) {
+            binding.emptyState.visibility = View.GONE
+            binding.rvGallery.visibility = View.VISIBLE
+            binding.breadcrumbScroll.visibility = View.VISIBLE
+
+            if (pathStack.isEmpty()) {
+                pathStack.add(PathSegment(getString(R.string.app_name), rootUri!!))
+            }
+            loadCurrentLevel()
+        } else {
+            binding.emptyState.visibility = View.VISIBLE
+            binding.rvGallery.visibility = View.GONE
+            binding.breadcrumbScroll.visibility = View.GONE
+        }
     }
 
-    override fun onPause() {
-        super.onPause()
-        unregisterReceiver(doneReceiver)
+    private fun navigateInto(folder: GalleryAdapter.FolderEntry) {
+        pathStack.add(PathSegment(folder.name, folder.uri))
+        loadCurrentLevel()
     }
 
-    private fun updateUI() {
-        binding.tvSourcePath.text = prefs.sourceUri?.toString() ?: getString(R.string.not_set)
-        binding.tvTmpPath.text = prefs.tmpUri?.toString() ?: getString(R.string.not_set)
-        binding.tvFinalPath.text = prefs.finalUri?.toString() ?: getString(R.string.not_set)
-        binding.tvGalleryRootPath.text = prefs.galleryRootUri?.toString() ?: getString(R.string.not_set)
+    private fun loadCurrentLevel() {
+        val uri = pathStack.last().uri
+        binding.progressBar.visibility = View.VISIBLE
+        binding.tvEmpty.visibility = View.GONE
 
-        binding.btnStart.isEnabled = prefs.sourceUri != null && prefs.tmpUri != null && prefs.finalUri != null
-        binding.btnViewCompressed.isEnabled = prefs.galleryRootUri != null
+        updateBreadcrumb()
+        binding.toolbar.title = pathStack.last().name
+
+        Thread {
+            val doc = DocumentFile.fromTreeUri(this, uri)
+            val folders = mutableListOf<GalleryAdapter.FolderEntry>()
+            val images = mutableListOf<GalleryAdapter.ImageEntry>()
+            var imgIndex = 0
+
+            doc?.listFiles()?.forEach { file ->
+                if (file.isDirectory) {
+                    val name = file.name ?: return@forEach
+                    val count = countImagesRecursive(file)
+                    if (count > 0) {
+                        folders.add(GalleryAdapter.FolderEntry(name, file.uri, count))
+                    }
+                } else {
+                    val name = file.name ?: return@forEach
+                    val ext = name.substringAfterLast('.', "").lowercase()
+                    if (ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")) {
+                        images.add(GalleryAdapter.ImageEntry(file.uri, name, imgIndex++))
+                    }
+                }
+            }
+
+            runOnUiThread {
+                binding.progressBar.visibility = View.GONE
+                if (folders.isEmpty() && images.isEmpty()) {
+                    binding.tvEmpty.visibility = View.VISIBLE
+                    binding.tvEmpty.text = getString(R.string.gallery_empty)
+                }
+                adapter.submitData(folders, images)
+            }
+        }.start()
     }
 
-    private fun startCompression() {
-        val srcUri = prefs.sourceUri
-        val tmpUri = prefs.tmpUri
-        val finalUri = prefs.finalUri
+    private fun countImagesRecursive(dir: DocumentFile): Int {
+        var count = 0
+        dir.listFiles().forEach { file ->
+            if (file.isDirectory) {
+                count += countImagesRecursive(file)
+            } else {
+                val name = file.name ?: return@forEach
+                val ext = name.substringAfterLast('.', "").lowercase()
+                if (ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")) {
+                    count++
+                }
+            }
+        }
+        return count
+    }
 
-        if (srcUri == null || tmpUri == null || finalUri == null) {
-            Toast.makeText(this, getString(R.string.error_no_source), Toast.LENGTH_SHORT).show()
+    private fun openFullScreen(index: Int) {
+        val images = adapter.getImages()
+        if (images.isEmpty()) return
+
+        val uris = images.map { it.uri.toString() }.toTypedArray()
+        val intent = Intent(this, FullScreenImageActivity::class.java).apply {
+            putExtra("uris", uris)
+            putExtra("position", index)
+        }
+        startActivity(intent)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (pathStack.size > 1) {
+            pathStack.removeLast()
+            loadCurrentLevel()
+        } else {
+            super.onBackPressed()
+        }
+    }
+
+    private fun updateBreadcrumb() {
+        binding.breadcrumb.removeAllViews()
+        if (pathStack.size <= 1) {
+            binding.breadcrumbScroll.visibility = View.GONE
             return
         }
+        binding.breadcrumbScroll.visibility = View.VISIBLE
 
-        val quality = binding.etQuality.text.toString().toIntOrNull() ?: 65
-        val maxRes = binding.etMaxRes.text.toString().toIntOrNull() ?: 1280
+        for (i in pathStack.indices) {
+            if (i > 0) {
+                val sep = TextView(this).apply {
+                    text = "  >  "
+                    textSize = 13f
+                    setPadding(4, 0, 4, 0)
+                }
+                binding.breadcrumb.addView(sep)
+            }
 
-        prefs.quality = quality
-        prefs.maxRes = maxRes
-
-        binding.btnStart.isEnabled = false
-        binding.progressBar.visibility = View.VISIBLE
-        binding.tvStatus.text = getString(R.string.compressing)
-
-        val intent = Intent(this, CompressService::class.java).apply {
-            putExtra("src", srcUri.toString())
-            putExtra("tmp", tmpUri.toString())
-            putExtra("final", finalUri.toString())
-            putExtra("quality", quality)
-            putExtra("maxres", maxRes)
+            val segment = pathStack[i]
+            val tv = TextView(this).apply {
+                text = segment.name
+                textSize = 13f
+                isAllCaps = i == 0
+                setPadding(8, 4, 8, 4)
+                setTextColor(getColor(if (i == pathStack.lastIndex) android.R.color.white else android.R.color.darker_gray))
+                if (i < pathStack.lastIndex) {
+                    setOnClickListener {
+                        while (pathStack.size > i + 1) pathStack.removeLast()
+                        loadCurrentLevel()
+                    }
+                }
+            }
+            binding.breadcrumb.addView(tv)
         }
-        startForegroundService(intent)
+
+        binding.breadcrumbScroll.post {
+            binding.breadcrumbScroll.fullScroll(View.FOCUS_RIGHT)
+        }
     }
 }
