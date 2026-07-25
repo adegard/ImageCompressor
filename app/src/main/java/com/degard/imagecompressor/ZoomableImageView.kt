@@ -8,61 +8,63 @@ import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
-import android.view.animation.DecelerateInterpolator
-import android.widget.OverScroller
 import androidx.appcompat.widget.AppCompatImageView
 
 class ZoomableImageView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyle: Int = 0
 ) : AppCompatImageView(context, attrs, defStyle) {
 
-    private val matrix = Matrix()
+    private val imgMatrix = Matrix()
     private val savedMatrix = Matrix()
-    private val matrixValues = FloatArray(9)
 
     private var mode = NONE
     private val startPoint = PointF()
     private var midPoint = PointF()
     private var oldDist = 1f
 
-    private var minScale = 1f
-    private var maxScale = 5f
+    private var baseScale = 1f
     private var currentScale = 1f
+    private val maxScale = 5f
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            val scaleFactor = detector.scaleFactor
-            currentScale *= scaleFactor
-            currentScale = currentScale.coerceIn(minScale, maxScale)
-            matrix.postScale(scaleFactor, scaleFactor, detector.focusX, detector.focusY)
-            constrainMatrix()
-            imageMatrix = matrix
+            val factor = detector.scaleFactor
+            val newScale = (currentScale * factor).coerceIn(baseScale, maxScale)
+            val realFactor = newScale / currentScale
+            currentScale = newScale
+            imgMatrix.postScale(realFactor, realFactor, detector.focusX, detector.focusY)
+            constrain()
+            imageMatrix = imgMatrix
             return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            if (currentScale < baseScale) {
+                animateTo(baseScale)
+            }
         }
     })
 
     private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            if (currentScale > 1.5f) {
-                resetZoom()
+            if (currentScale > baseScale * 1.5f) {
+                animateTo(baseScale)
             } else {
-                zoomTo(3f, e.x, e.y)
+                animateTo(baseScale * 3f, e.x, e.y)
             }
             return true
         }
 
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
-            if (currentScale > 1f) {
-                matrix.postTranslate(-dx, -dy)
-                constrainMatrix()
-                imageMatrix = matrix
+            if (currentScale > baseScale) {
+                imgMatrix.postTranslate(-dx, -dy)
+                constrain()
+                imageMatrix = imgMatrix
+                return true
             }
-            return true
+            return false
         }
     })
-
-    private val scroller = OverScroller(context)
-    private var scrollAction: Runnable? = null
 
     init {
         scaleType = ScaleType.MATRIX
@@ -70,148 +72,139 @@ class ZoomableImageView @JvmOverloads constructor(
 
     override fun setImageDrawable(drawable: Drawable?) {
         super.setImageDrawable(drawable)
-        post { resetZoom() }
+        post { fitCenter() }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleDetector.onTouchEvent(event)
-        gestureDetector.onTouchEvent(event)
+        var handled = scaleDetector.onTouchEvent(event)
+        handled = gestureDetector.onTouchEvent(event) || handled
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 mode = DRAG
                 startPoint.set(event.x, event.y)
-                savedMatrix.set(matrix)
-                stopScroll()
-                parent.requestDisallowInterceptTouchEvent(true)
+                savedMatrix.set(imgMatrix)
+                if (currentScale > baseScale) {
+                    parent.requestDisallowInterceptTouchEvent(true)
+                }
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 mode = ZOOM
                 oldDist = spacing(event)
                 midPoint = mid(event)
-                savedMatrix.set(matrix)
+                savedMatrix.set(imgMatrix)
                 parent.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (mode == ZOOM && event.pointerCount >= 2) {
                     val newDist = spacing(event)
                     if (newDist > 10f) {
-                        val scale = newDist / oldDist
-                        matrix.set(savedMatrix)
-                        currentScale *= scale
-                        currentScale = currentScale.coerceIn(minScale, maxScale)
-                        matrix.postScale(scale, scale, midPoint.x, midPoint.y)
-                        constrainMatrix()
-                        imageMatrix = matrix
+                        val factor = (newDist / oldDist).coerceIn(0.5f, 2.0f)
+                        val newScale = (currentScale * factor).coerceIn(baseScale, maxScale)
+                        val realFactor = newScale / currentScale
+                        currentScale = newScale
+                        imgMatrix.set(savedMatrix)
+                        imgMatrix.postScale(realFactor, realFactor, midPoint.x, midPoint.y)
+                        constrain()
+                        imageMatrix = imgMatrix
                         oldDist = newDist
+                        handled = true
                     }
+                } else if (mode == DRAG && currentScale > baseScale) {
+                    val dx = event.x - startPoint.x
+                    val dy = event.y - startPoint.y
+                    imgMatrix.set(savedMatrix)
+                    imgMatrix.postTranslate(dx, dy)
+                    constrain()
+                    imageMatrix = imgMatrix
+                    handled = true
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                val wasZooming = mode == ZOOM
                 mode = NONE
-                if (currentScale < minScale) {
-                    resetZoom()
-                }
-                if (currentScale <= 1f) {
+                if (currentScale <= baseScale) {
                     parent.requestDisallowInterceptTouchEvent(false)
                 }
             }
         }
-        return true
+        return handled || super.onTouchEvent(event)
     }
 
-    private fun resetZoom() {
-        currentScale = minScale
-        matrix.reset()
-        centerImage()
-        imageMatrix = matrix
+    private fun fitCenter() {
+        val d = drawable ?: return
+        val vw = width.toFloat()
+        val vh = height.toFloat()
+        if (vw == 0f || vh == 0f) return
+
+        val iw = d.intrinsicWidth.toFloat()
+        val ih = d.intrinsicHeight.toFloat()
+        if (iw <= 0f || ih <= 0f) return
+
+        val scale = minOf(vw / iw, vh / ih)
+        baseScale = scale
+        currentScale = scale
+
+        val dx = (vw - iw * scale) / 2f
+        val dy = (vh - ih * scale) / 2f
+        imgMatrix.reset()
+        imgMatrix.setScale(scale, scale)
+        imgMatrix.postTranslate(dx, dy)
+        imageMatrix = imgMatrix
     }
 
-    private fun zoomTo(targetScale: Float, focusX: Float, focusY: Float) {
+    private fun animateTo(targetScale: Float, focusX: Float = width / 2f, focusY: Float = height / 2f) {
         val startScale = currentScale
+        val startMatrix = Matrix(imgMatrix)
         val startTime = System.currentTimeMillis()
         val duration = 300L
 
-        scrollAction?.let { removeCallbacks(it) }
-        scrollAction = object : Runnable {
+        val animRunnable = object : Runnable {
             override fun run() {
-                val elapsed = System.currentTimeMillis() - startTime
-                val t = (elapsed.toFloat() / duration).coerceAtMost(1f)
+                val t = ((System.currentTimeMillis() - startTime).toFloat() / duration).coerceAtMost(1f)
                 val eased = 1f - (1f - t) * (1f - t)
-                val newScale = startScale + (targetScale - startScale) * eased
-                val factor = newScale / currentScale
-                currentScale = newScale
-                matrix.postScale(factor, factor, focusX, focusY)
-                constrainMatrix()
-                imageMatrix = matrix
+                val s = startScale + (targetScale - startScale) * eased
+                val factor = s / currentScale
+                currentScale = s
+                imgMatrix.set(startMatrix)
+                imgMatrix.postScale(factor, factor, focusX, focusY)
+                constrain()
+                imageMatrix = imgMatrix
                 if (t < 1f) postOnAnimation(this)
             }
         }
-        postOnAnimation(scrollAction!!)
+        removeCallbacks(null)
+        postOnAnimation(animRunnable)
     }
 
-    private fun centerImage() {
-        val d = drawable ?: return
-        val viewWidth = width.toFloat()
-        val viewHeight = height.toFloat()
-        val imgWidth = d.intrinsicWidth.toFloat()
-        val imgHeight = d.intrinsicHeight.toFloat()
-
-        val scale = minOf(viewWidth / imgWidth, viewHeight / imgHeight, 1f)
-        currentScale = scale
-        minScale = scale
-
-        val dx = (viewWidth - imgWidth * scale) / 2f
-        val dy = (viewHeight - imgHeight * scale) / 2f
-        matrix.setScale(scale, scale)
-        matrix.postTranslate(dx, dy)
-    }
-
-    private fun constrainMatrix() {
+    private fun constrain() {
         val d = drawable ?: return
         val values = FloatArray(9)
-        matrix.getValues(values)
-        val scaleX = values[Matrix.MSCALE_X]
-        val imgWidth = d.intrinsicWidth * scaleX
-        val imgHeight = d.intrinsicHeight * scaleX
+        imgMatrix.getValues(values)
+        val sx = values[Matrix.MSCALE_X]
 
-        var transX = values[Matrix.MTRANS_X]
-        var transY = values[Matrix.MTRANS_Y]
+        val imgW = d.intrinsicWidth * sx
+        val imgH = d.intrinsicHeight * sx
+        val vw = width.toFloat()
+        val vh = height.toFloat()
 
-        val viewWidth = width.toFloat()
-        val viewHeight = height.toFloat()
+        var tx = values[Matrix.MTRANS_X]
+        var ty = values[Matrix.MTRANS_Y]
 
-        if (imgWidth <= viewWidth) {
-            transX = (viewWidth - imgWidth) / 2f
-        } else {
-            transX = transX.coerceIn(viewWidth - imgWidth, 0f)
-        }
+        tx = if (imgW <= vw) (vw - imgW) / 2f else tx.coerceIn(vw - imgW, 0f)
+        ty = if (imgH <= vh) (vh - imgH) / 2f else ty.coerceIn(vh - imgH, 0f)
 
-        if (imgHeight <= viewHeight) {
-            transY = (viewHeight - imgHeight) / 2f
-        } else {
-            transY = transY.coerceIn(viewHeight - imgHeight, 0f)
-        }
-
-        matrix.postTranslate(transX - values[Matrix.MTRANS_X], transY - values[Matrix.MTRANS_Y])
+        imgMatrix.postTranslate(tx - values[Matrix.MTRANS_X], ty - values[Matrix.MTRANS_Y])
     }
 
-    private fun spacing(event: MotionEvent): Float {
-        val x = event.getX(0) - event.getX(1)
-        val y = event.getY(0) - event.getY(1)
-        return Math.sqrt((x * x + y * y).toDouble()).toFloat()
+    private fun spacing(e: MotionEvent): Float {
+        val dx = e.getX(0) - e.getX(1)
+        val dy = e.getY(0) - e.getY(1)
+        return Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
     }
 
-    private fun mid(event: MotionEvent): PointF {
-        val x = event.getX(0) + event.getX(1)
-        val y = event.getY(0) + event.getY(1)
-        return PointF(x / 2f, y / 2f)
-    }
-
-    private fun stopScroll() {
-        scrollAction?.let { removeCallbacks(it) }
-        scroller.forceFinished(true)
-    }
+    private fun mid(e: MotionEvent): PointF =
+        PointF((e.getX(0) + e.getX(1)) / 2f, (e.getY(0) + e.getY(1)) / 2f)
 
     companion object {
         private const val NONE = 0
