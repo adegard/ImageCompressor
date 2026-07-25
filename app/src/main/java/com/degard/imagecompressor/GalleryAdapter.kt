@@ -67,7 +67,7 @@ class GalleryAdapter(
     inner class FolderVH(private val b: GalleryFolderItemBinding) : RecyclerView.ViewHolder(b.root) {
         fun bind(folder: FolderEntry) {
             b.tvFolderName.text = folder.name
-            b.tvFolderCount.text = itemView.context.getString(R.string.gallery_subfolder_count, folder.childCount)
+            b.tvFolderCount.text = itemView.context.getString(R.string.gallery_folder)
             b.root.setOnClickListener { onFolderClick(folder) }
         }
     }

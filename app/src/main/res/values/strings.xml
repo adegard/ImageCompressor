@@ -21,6 +21,7 @@
     <string name="gallery_loading">Loading…</string>
     <string name="label_gallery_root">Gallery root folder (for viewing)</string>
     <string name="gallery_subfolder_count">%d photos</string>
+    <string name="gallery_folder">Folder</string>
     <string name="rotate">Rotate</string>
     <string name="delete">Delete</string>
     <string name="confirm_delete_title">Delete photo</string>

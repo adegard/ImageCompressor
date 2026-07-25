@@ -13,6 +13,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val pathStack = mutableListOf<PathEntry>()
+    @Volatile private var loadGeneration = 0
 
     data class PathEntry(val uri: Uri, val title: String)
 
@@ -63,12 +64,6 @@ class MainActivity : AppCompatActivity() {
         if (pathStack.isNotEmpty()) {
             FolderCache.invalidate(pathStack.last().uri)
             loadCurrentLevel()
-        } else {
-            val savedUri = Prefs(this).galleryRootUri
-            if (savedUri != null) {
-                pathStack.add(PathEntry(savedUri, getString(R.string.gallery_title)))
-                loadCurrentLevel()
-            }
         }
     }
 
@@ -82,6 +77,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         showEmptyState(false)
+        binding.progressBar.visibility = View.GONE
 
         val cached = FolderCache.get(entry.uri)
         if (cached != null) {
@@ -90,20 +86,24 @@ class MainActivity : AppCompatActivity() {
             binding.progressBar.visibility = View.VISIBLE
         }
 
+        val gen = ++loadGeneration
         Thread {
             try {
                 val children = queryChildren(entry.uri)
+                if (gen != loadGeneration) return@Thread
                 FolderCache.put(entry.uri, children)
                 runOnUiThread {
-                    binding.progressBar.visibility = View.GONE
-                    displayEntries(children)
-                    if (children.isEmpty()) showEmptyState(true)
+                    if (gen == loadGeneration) {
+                        binding.progressBar.visibility = View.GONE
+                        displayEntries(children)
+                        if (children.isEmpty()) showEmptyState(true)
+                    }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    binding.progressBar.visibility = View.GONE
-                    if (cached == null) {
-                        showEmptyState(true)
+                    if (gen == loadGeneration) {
+                        binding.progressBar.visibility = View.GONE
+                        if (cached == null) showEmptyState(true)
                     }
                 }
             }
@@ -111,7 +111,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun displayEntries(entries: List<FolderCache.CachedEntry>) {
-        val folders = entries.filter { it.isDirectory && it.imageCount > 0 }
+        val folders = entries.filter { it.isDirectory }
             .map { GalleryAdapter.FolderEntry(it.name, Uri.parse(it.uri), it.imageCount) }
         val images = mutableListOf<GalleryAdapter.ImageEntry>()
         var imgIndex = 0
@@ -150,12 +150,10 @@ class MainActivity : AppCompatActivity() {
 
                 val childUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
 
-                val imageCount = if (isDir) {
-                    countImagesFast(parentUri, docId)
-                } else {
+                val imageCount = if (!isDir) {
                     val ext = name.substringAfterLast('.', "").lowercase()
                     if (ext in imageExtensions) 1 else 0
-                }
+                } else 0
 
                 entries.add(
                     FolderCache.CachedEntry(
@@ -173,41 +171,6 @@ class MainActivity : AppCompatActivity() {
 
         entries.sortWith(compareByDescending<FolderCache.CachedEntry> { it.isDirectory }.thenBy { it.name })
         return entries
-    }
-
-    private fun countImagesFast(treeUri: Uri, documentId: String): Int {
-        val resolver = contentResolver
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
-
-        var count = 0
-        var cursor: Cursor? = null
-        try {
-            cursor = resolver.query(
-                childrenUri,
-                arrayOf(
-                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE
-                ),
-                null, null, null
-            ) ?: return 0
-
-            while (cursor.moveToNext()) {
-                val childDocId = cursor.getString(0)
-                val name = cursor.getString(1) ?: continue
-                val mime = cursor.getString(2) ?: ""
-                if (DocumentsContract.Document.MIME_TYPE_DIR == mime) {
-                    count += countImagesFast(treeUri, childDocId)
-                } else {
-                    val ext = name.substringAfterLast('.', "").lowercase()
-                    if (ext in setOf("jpg", "jpeg", "png", "webp", "heic", "heif")) count++
-                }
-            }
-        } catch (_: Exception) {
-        } finally {
-            cursor?.close()
-        }
-        return count
     }
 
     private fun openFullScreen(index: Int) {
