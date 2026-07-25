@@ -15,22 +15,24 @@ class ZoomableImageView @JvmOverloads constructor(
 ) : AppCompatImageView(context, attrs, defStyle) {
 
     private val imgMatrix = Matrix()
-    private val savedMatrix = Matrix()
-
-    private var mode = NONE
-    private val startPoint = PointF()
-    private var midPoint = PointF()
-    private var oldDist = 1f
-
     private var baseScale = 1f
     private var currentScale = 1f
     private val maxScale = 5f
+    private var isScaling = false
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            isScaling = true
+            parent.requestDisallowInterceptTouchEvent(true)
+            return true
+        }
+
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             val factor = detector.scaleFactor
+            if (factor.isNaN() || factor <= 0f) return true
             val newScale = (currentScale * factor).coerceIn(baseScale, maxScale)
             val realFactor = newScale / currentScale
+            if (realFactor == 1f) return true
             currentScale = newScale
             imgMatrix.postScale(realFactor, realFactor, detector.focusX, detector.focusY)
             constrain()
@@ -39,9 +41,11 @@ class ZoomableImageView @JvmOverloads constructor(
         }
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
-            if (currentScale < baseScale) {
+            isScaling = false
+            if (currentScale <= baseScale * 1.05f) {
                 animateTo(baseScale)
             }
+            parent.requestDisallowInterceptTouchEvent(false)
         }
     })
 
@@ -56,10 +60,11 @@ class ZoomableImageView @JvmOverloads constructor(
         }
 
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
-            if (currentScale > baseScale) {
+            if (currentScale > baseScale && !isScaling) {
                 imgMatrix.postTranslate(-dx, -dy)
                 constrain()
                 imageMatrix = imgMatrix
+                parent.requestDisallowInterceptTouchEvent(true)
                 return true
             }
             return false
@@ -76,59 +81,17 @@ class ZoomableImageView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        var handled = scaleDetector.onTouchEvent(event)
-        handled = gestureDetector.onTouchEvent(event) || handled
+        scaleDetector.onTouchEvent(event)
+        gestureDetector.onTouchEvent(event)
 
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                mode = DRAG
-                startPoint.set(event.x, event.y)
-                savedMatrix.set(imgMatrix)
-                if (currentScale > baseScale) {
-                    parent.requestDisallowInterceptTouchEvent(true)
-                }
-            }
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                mode = ZOOM
-                oldDist = spacing(event)
-                midPoint = mid(event)
-                savedMatrix.set(imgMatrix)
-                parent.requestDisallowInterceptTouchEvent(true)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                if (mode == ZOOM && event.pointerCount >= 2) {
-                    val newDist = spacing(event)
-                    if (newDist > 10f) {
-                        val factor = (newDist / oldDist).coerceIn(0.5f, 2.0f)
-                        val newScale = (currentScale * factor).coerceIn(baseScale, maxScale)
-                        val realFactor = newScale / currentScale
-                        currentScale = newScale
-                        imgMatrix.set(savedMatrix)
-                        imgMatrix.postScale(realFactor, realFactor, midPoint.x, midPoint.y)
-                        constrain()
-                        imageMatrix = imgMatrix
-                        oldDist = newDist
-                        handled = true
-                    }
-                } else if (mode == DRAG && currentScale > baseScale) {
-                    val dx = event.x - startPoint.x
-                    val dy = event.y - startPoint.y
-                    imgMatrix.set(savedMatrix)
-                    imgMatrix.postTranslate(dx, dy)
-                    constrain()
-                    imageMatrix = imgMatrix
-                    handled = true
-                }
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                val wasZooming = mode == ZOOM
-                mode = NONE
-                if (currentScale <= baseScale) {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (!isScaling && currentScale <= baseScale) {
                     parent.requestDisallowInterceptTouchEvent(false)
                 }
             }
         }
-        return handled || super.onTouchEvent(event)
+        return true
     }
 
     private fun fitCenter() {
@@ -136,7 +99,6 @@ class ZoomableImageView @JvmOverloads constructor(
         val vw = width.toFloat()
         val vh = height.toFloat()
         if (vw == 0f || vh == 0f) return
-
         val iw = d.intrinsicWidth.toFloat()
         val ih = d.intrinsicHeight.toFloat()
         if (iw <= 0f || ih <= 0f) return
@@ -159,12 +121,12 @@ class ZoomableImageView @JvmOverloads constructor(
         val startTime = System.currentTimeMillis()
         val duration = 300L
 
-        val animRunnable = object : Runnable {
+        val anim = object : Runnable {
             override fun run() {
                 val t = ((System.currentTimeMillis() - startTime).toFloat() / duration).coerceAtMost(1f)
                 val eased = 1f - (1f - t) * (1f - t)
                 val s = startScale + (targetScale - startScale) * eased
-                val factor = s / currentScale
+                val factor = if (currentScale > 0f) s / currentScale else 1f
                 currentScale = s
                 imgMatrix.set(startMatrix)
                 imgMatrix.postScale(factor, factor, focusX, focusY)
@@ -173,8 +135,7 @@ class ZoomableImageView @JvmOverloads constructor(
                 if (t < 1f) postOnAnimation(this)
             }
         }
-        removeCallbacks(null)
-        postOnAnimation(animRunnable)
+        postOnAnimation(anim)
     }
 
     private fun constrain() {
@@ -182,7 +143,6 @@ class ZoomableImageView @JvmOverloads constructor(
         val values = FloatArray(9)
         imgMatrix.getValues(values)
         val sx = values[Matrix.MSCALE_X]
-
         val imgW = d.intrinsicWidth * sx
         val imgH = d.intrinsicHeight * sx
         val vw = width.toFloat()
@@ -190,25 +150,8 @@ class ZoomableImageView @JvmOverloads constructor(
 
         var tx = values[Matrix.MTRANS_X]
         var ty = values[Matrix.MTRANS_Y]
-
         tx = if (imgW <= vw) (vw - imgW) / 2f else tx.coerceIn(vw - imgW, 0f)
         ty = if (imgH <= vh) (vh - imgH) / 2f else ty.coerceIn(vh - imgH, 0f)
-
         imgMatrix.postTranslate(tx - values[Matrix.MTRANS_X], ty - values[Matrix.MTRANS_Y])
-    }
-
-    private fun spacing(e: MotionEvent): Float {
-        val dx = e.getX(0) - e.getX(1)
-        val dy = e.getY(0) - e.getY(1)
-        return Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-    }
-
-    private fun mid(e: MotionEvent): PointF =
-        PointF((e.getX(0) + e.getX(1)) / 2f, (e.getY(0) + e.getY(1)) / 2f)
-
-    companion object {
-        private const val NONE = 0
-        private const val DRAG = 1
-        private const val ZOOM = 2
     }
 }
