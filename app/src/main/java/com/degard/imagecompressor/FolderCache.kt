@@ -19,6 +19,8 @@ object FolderCache {
         if (db == null) db = GalleryDb(context.applicationContext)
     }
 
+    fun getDb(): GalleryDb? = db
+
     fun get(key: String): List<CachedEntry>? = db?.getEntries(key)
 
     fun put(key: String, entries: List<CachedEntry>) {

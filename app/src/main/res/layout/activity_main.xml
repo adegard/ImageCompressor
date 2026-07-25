@@ -13,6 +13,45 @@
         app:title="@string/app_name"
         app:menu="@menu/menu_main" />
 
+    <LinearLayout
+        android:id="@+id/selectionBar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="?attr/colorPrimaryContainer"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/btnCancelSelection"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_arrow_back"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Cancel" />
+
+        <TextView
+            android:id="@+id/tvSelectionCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="?android:textColorPrimary"
+            android:textSize="16sp"
+            android:layout_marginStart="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTagSelected"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/tag"
+            android:textSize="13sp"
+            app:icon="@drawable/ic_tag"
+            app:iconSize="16dp"
+            style="@style/Widget.Material3.Button.TonalButton" />
+
+    </LinearLayout>
+
     <HorizontalScrollView
         android:id="@+id/breadcrumbScroll"
         android:layout_width="match_parent"

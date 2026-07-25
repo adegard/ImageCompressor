@@ -45,6 +45,20 @@
                 android:textColor="?android:textColorSecondary"
                 android:layout_marginTop="2dp" />
 
+            <TextView
+                android:id="@+id/tvFolderTag"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="10sp"
+                android:textColor="?attr/colorPrimary"
+                android:drawablePadding="4dp"
+                android:drawableStart="@drawable/ic_tag"
+                android:layout_marginTop="2dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:visibility="gone"
+                android:contentDescription="Folder tag" />
+
         </LinearLayout>
 
     </LinearLayout>

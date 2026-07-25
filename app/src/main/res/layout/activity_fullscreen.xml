@@ -10,6 +10,23 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <TextView
+        android:id="@+id/tvTagBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="72dp"
+        android:layout_marginStart="12dp"
+        android:background="#AA000000"
+        android:textColor="@android:color/white"
+        android:textSize="12sp"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="5dp"
+        android:drawablePadding="6dp"
+        android:drawableStart="@drawable/ic_tag"
+        android:visibility="gone"
+        android:contentDescription="Tags" />
+
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -45,7 +62,7 @@
             android:id="@+id/btnRotate"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="8dp"
             android:text="@string/rotate"
             android:textColor="@android:color/white"
             app:icon="@drawable/ic_rotate"
@@ -57,12 +74,24 @@
             android:id="@+id/btnShare"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="8dp"
             android:text="@string/share"
             android:textColor="@android:color/white"
             app:icon="@drawable/ic_share"
             app:iconTint="@android:color/white"
             app:backgroundTint="#AA33B5E5"
+            style="@style/Widget.Material3.Button" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTag"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:text="@string/tag"
+            android:textColor="@android:color/white"
+            app:icon="@drawable/ic_tag"
+            app:iconTint="@android:color/white"
+            app:backgroundTint="#AAFFA000"
             style="@style/Widget.Material3.Button" />
 
     </LinearLayout>

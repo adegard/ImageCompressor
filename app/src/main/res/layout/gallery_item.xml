@@ -19,6 +19,31 @@
             android:scaleType="centerCrop"
             android:background="?android:attr/colorBackground" />
 
+        <ImageView
+            android:id="@+id/ivTagIcon"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="4dp"
+            android:src="@drawable/ic_tag"
+            android:background="#88000000"
+            android:padding="2dp"
+            android:visibility="gone"
+            android:contentDescription="Tagged" />
+
+        <CheckBox
+            android:id="@+id/cbSelect"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="top|start"
+            android:layout_margin="4dp"
+            android:background="#88000000"
+            android:buttonTint="@android:color/white"
+            android:visibility="gone"
+            android:clickable="false"
+            android:focusable="false"
+            android:contentDescription="Select" />
+
         <TextView
             android:id="@+id/tvFileName"
             android:layout_width="match_parent"

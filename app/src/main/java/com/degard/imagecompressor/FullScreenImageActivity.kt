@@ -10,12 +10,18 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.degard.imagecompressor.databinding.ActivityFullscreenBinding
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class FullScreenImageActivity : AppCompatActivity() {
 
@@ -43,15 +49,18 @@ class FullScreenImageActivity : AppCompatActivity() {
             override fun onPageSelected(position: Int) {
                 currentPosition = position
                 updateTitle()
+                updateTagBadge()
             }
         })
 
         binding.toolbar.setNavigationOnClickListener { finish() }
         updateTitle()
+        updateTagBadge()
 
         binding.btnDelete.setOnClickListener { confirmDelete() }
         binding.btnRotate.setOnClickListener { rotateCurrent() }
         binding.btnShare.setOnClickListener { shareCurrent() }
+        binding.btnTag.setOnClickListener { showTagDialog() }
 
         setupTapToToggle()
     }
@@ -82,17 +91,96 @@ class FullScreenImageActivity : AppCompatActivity() {
         binding.toolbar.title = "${currentPosition + 1}/${uris.size}  -  $name"
     }
 
+    private fun updateTagBadge() {
+        val tags = TagManager.getTags(this, uris[currentPosition])
+        if (tags.isNotEmpty()) {
+            binding.tvTagBadge.text = tags.joinToString(", ")
+            binding.tvTagBadge.visibility = View.VISIBLE
+        } else {
+            binding.tvTagBadge.visibility = View.GONE
+        }
+    }
+
+    private fun showTagDialog() {
+        val uri = uris[currentPosition]
+        val currentTags = TagManager.getTags(this, uri)
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val dp16 = (16 * resources.displayMetrics.density).toInt()
+            setPadding(dp16, dp16, dp16, 0)
+        }
+
+        val input = EditText(this).apply {
+            hint = getString(R.string.tag_hint)
+            setText(currentTags.joinToString(", "))
+            setSelection(text.length)
+        }
+        layout.addView(input)
+
+        val allExistingTags = mutableSetOf<String>()
+        for (u in uris) {
+            allExistingTags.addAll(TagManager.getTags(this, u))
+        }
+        allExistingTags.addAll(currentTags)
+        val suggestions = allExistingTags.sorted()
+
+        if (suggestions.isNotEmpty()) {
+            val label = TextView(this).apply {
+                text = "Existing tags:"
+                textSize = 12f
+                val dp8 = (8 * resources.displayMetrics.density).toInt()
+                setPadding(0, dp8, 0, dp8)
+            }
+            layout.addView(label)
+
+            val chipGroup = ChipGroup(this).apply {
+                isSingleLine = false
+            }
+            for (tag in suggestions) {
+                val chip = Chip(this).apply {
+                    text = tag
+                    isClickable = true
+                    setOnClickListener {
+                        val current = input.text.toString()
+                        val parts = current.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        if (tag !in parts) {
+                            val newText = if (current.isEmpty()) tag else "$current, $tag"
+                            input.setText(newText)
+                            input.setSelection(newText.length)
+                        }
+                    }
+                }
+                chipGroup.addView(chip)
+            }
+            layout.addView(chipGroup)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.add_tag)
+            .setView(layout)
+            .setPositiveButton(R.string.tag) { _, _ ->
+                val raw = input.text.toString()
+                val tags = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+                TagManager.setTags(this, uri, tags)
+                updateTagBadge()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     private fun toggleBars() {
         barsVisible = !barsVisible
         val alpha = if (barsVisible) 1f else 0f
         binding.toolbar.animate().alpha(alpha).setDuration(200).start()
         binding.bottomBar.animate().alpha(alpha).setDuration(200).start()
+        binding.tvTagBadge.animate().alpha(alpha).setDuration(200).start()
         binding.toolbar.visibility = if (barsVisible) View.VISIBLE else View.GONE
         binding.bottomBar.visibility = if (barsVisible) View.VISIBLE else View.GONE
     }
 
     private fun confirmDelete() {
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.confirm_delete_title)
             .setMessage(R.string.confirm_delete_msg)
             .setPositiveButton(R.string.delete) { _, _ -> deleteCurrent() }
@@ -116,6 +204,7 @@ class FullScreenImageActivity : AppCompatActivity() {
         binding.viewPager.adapter?.notifyDataSetChanged()
         binding.viewPager.setCurrentItem(currentPosition, false)
         updateTitle()
+        updateTagBadge()
     }
 
     private fun shareCurrent() {

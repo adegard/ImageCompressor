@@ -4,7 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db", null, 2) {
+class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db", null, 3) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -18,11 +18,24 @@ class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db"
                 PRIMARY KEY (folder_key, child_uri)
             )"""
         )
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS folder_annotations (
+                folder_key TEXT PRIMARY KEY,
+                tag TEXT NOT NULL
+            )"""
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS folder_entries")
-        onCreate(db)
+        if (oldVersion < 3) {
+            db.execSQL("DROP TABLE IF EXISTS folder_annotations")
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS folder_annotations (
+                    folder_key TEXT PRIMARY KEY,
+                    tag TEXT NOT NULL
+                )"""
+            )
+        }
     }
 
     fun getEntries(folderKey: String): List<FolderCache.CachedEntry>? {
@@ -79,5 +92,43 @@ class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db"
 
     fun invalidateAll() {
         writableDatabase.delete("folder_entries", null, null)
+    }
+
+    fun getFolderTag(folderKey: String): String? {
+        readableDatabase.query(
+            "folder_annotations",
+            arrayOf("tag"),
+            "folder_key = ?",
+            arrayOf(folderKey),
+            null, null, null
+        ).use { cursor ->
+            if (cursor.moveToFirst()) return cursor.getString(0)
+        }
+        return null
+    }
+
+    fun setFolderTag(folderKey: String, tag: String) {
+        if (tag.isEmpty()) {
+            writableDatabase.delete("folder_annotations", "folder_key = ?", arrayOf(folderKey))
+        } else {
+            writableDatabase.execSQL(
+                "INSERT OR REPLACE INTO folder_annotations (folder_key, tag) VALUES (?, ?)",
+                arrayOf(folderKey, tag)
+            )
+        }
+    }
+
+    fun getAllTags(): List<String> {
+        val tags = mutableListOf<String>()
+        readableDatabase.query(
+            "folder_annotations",
+            arrayOf("tag"),
+            null, null, null, null, null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                tags.add(cursor.getString(0))
+            }
+        }
+        return tags.distinct().sorted()
     }
 }
