@@ -4,10 +4,10 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.GridLayoutManager
 import com.degard.imagecompressor.databinding.ActivityMainBinding
 import com.google.android.material.color.MaterialColors
@@ -20,6 +20,8 @@ class MainActivity : AppCompatActivity() {
 
     private data class PathSegment(val name: String, val uri: Uri)
     private val pathStack = mutableListOf<PathSegment>()
+
+    private val imageExts = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,18 +101,17 @@ class MainActivity : AppCompatActivity() {
             if (cached != null) {
                 entries = cached
             } else {
-                val doc = DocumentFile.fromTreeUri(this, uri)
                 val result = mutableListOf<FolderCache.CachedEntry>()
+                val children = queryChildren(uri)
 
-                doc?.listFiles()?.forEach { file ->
-                    val name = file.name ?: return@forEach
-                    if (file.isDirectory) {
-                        val count = countImagesRecursive(file)
-                        result.add(FolderCache.CachedEntry(name, file.uri.toString(), true, count))
+                for ((name, childUri, isDir) in children) {
+                    if (isDir) {
+                        val count = countImagesFast(childUri)
+                        result.add(FolderCache.CachedEntry(name, childUri.toString(), true, count))
                     } else {
                         val ext = name.substringAfterLast('.', "").lowercase()
-                        if (ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")) {
-                            result.add(FolderCache.CachedEntry(name, file.uri.toString(), false))
+                        if (ext in imageExts) {
+                            result.add(FolderCache.CachedEntry(name, childUri.toString(), false))
                         }
                     }
                 }
@@ -140,17 +141,46 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun countImagesRecursive(dir: DocumentFile): Int {
+    private fun queryChildren(parentUri: Uri): List<Triple<String, Uri, Boolean>> {
+        val result = mutableListOf<Triple<String, Uri, Boolean>>()
+        val treeId = DocumentsContract.getTreeDocumentId(parentUri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, treeId)
+
+        contentResolver.query(
+            childrenUri,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
+            ),
+            null, null, null
+        )?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val mimeCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+
+            while (cursor.moveToNext()) {
+                val docId = cursor.getString(idCol)
+                val name = cursor.getString(nameCol) ?: continue
+                val mime = cursor.getString(mimeCol) ?: ""
+                val childUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
+                val isDir = DocumentsContract.Document.MIME_TYPE_DIR == mime
+                result.add(Triple(name, childUri, isDir))
+            }
+        }
+
+        return result
+    }
+
+    private fun countImagesFast(dirUri: Uri): Int {
         var count = 0
-        dir.listFiles().forEach { file ->
-            if (file.isDirectory) {
-                count += countImagesRecursive(file)
+        val children = queryChildren(dirUri)
+        for ((name, childUri, isDir) in children) {
+            if (isDir) {
+                count += countImagesFast(childUri)
             } else {
-                val name = file.name ?: return@forEach
                 val ext = name.substringAfterLast('.', "").lowercase()
-                if (ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")) {
-                    count++
-                }
+                if (ext in imageExts) count++
             }
         }
         return count
