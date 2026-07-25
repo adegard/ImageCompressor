@@ -5,7 +5,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import android.os.Bundle
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -47,12 +49,31 @@ class FullScreenImageActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         updateTitle()
 
-        binding.viewPager.setOnClickListener { toggleBars() }
-
         binding.btnDelete.setOnClickListener { confirmDelete() }
         binding.btnRotate.setOnClickListener { rotateCurrent() }
 
-        toggleBars()
+        setupTapToToggle()
+    }
+
+    private fun setupTapToToggle() {
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                toggleBars()
+                return true
+            }
+        })
+
+        binding.viewPager.post {
+            val child = binding.viewPager.getChildAt(0) ?: return@post
+            if (child is RecyclerView) {
+                child.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+                    override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                        gestureDetector.onTouchEvent(e)
+                        return false
+                    }
+                })
+            }
+        }
     }
 
     private fun updateTitle() {

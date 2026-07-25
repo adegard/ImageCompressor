@@ -1,5 +1,6 @@
 package com.degard.imagecompressor
 
+import android.content.Context
 import android.net.Uri
 
 object FolderCache {
@@ -11,19 +12,23 @@ object FolderCache {
         val imageCount: Int = 0
     )
 
-    private val cache = mutableMapOf<String, List<CachedEntry>>()
+    private var db: GalleryDb? = null
 
-    fun get(uri: Uri): List<CachedEntry>? = cache[uri.toString()]
+    fun init(context: Context) {
+        if (db == null) db = GalleryDb(context.applicationContext)
+    }
+
+    fun get(uri: Uri): List<CachedEntry>? = db?.getEntries(uri.toString())
 
     fun put(uri: Uri, entries: List<CachedEntry>) {
-        cache[uri.toString()] = entries
+        db?.putEntries(uri.toString(), entries)
     }
 
     fun invalidate(uri: Uri) {
-        cache.remove(uri.toString())
+        db?.invalidate(uri.toString())
     }
 
     fun invalidateAll() {
-        cache.clear()
+        db?.invalidateAll()
     }
 }
