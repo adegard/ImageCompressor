@@ -27,6 +27,7 @@
     <string name="confirm_delete_title">Delete photo</string>
     <string name="confirm_delete_msg">Delete this photo permanently?</string>
     <string name="cancel">Cancel</string>
+    <string name="share">Share</string>
     <string name="error_no_gallery_root">Select a gallery root folder first</string>
     <string name="settings">Settings</string>
     <string name="open_settings">Open Settings</string>

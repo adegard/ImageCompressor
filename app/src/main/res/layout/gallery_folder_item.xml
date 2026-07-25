@@ -32,7 +32,7 @@
                 android:id="@+id/tvFolderName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="14sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end" />

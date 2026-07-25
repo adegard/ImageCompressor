@@ -51,6 +51,7 @@ class FullScreenImageActivity : AppCompatActivity() {
 
         binding.btnDelete.setOnClickListener { confirmDelete() }
         binding.btnRotate.setOnClickListener { rotateCurrent() }
+        binding.btnShare.setOnClickListener { shareCurrent() }
 
         setupTapToToggle()
     }
@@ -115,6 +116,16 @@ class FullScreenImageActivity : AppCompatActivity() {
         binding.viewPager.adapter?.notifyDataSetChanged()
         binding.viewPager.setCurrentItem(currentPosition, false)
         updateTitle()
+    }
+
+    private fun shareCurrent() {
+        val uri = uris[currentPosition]
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "image/*"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(android.content.Intent.createChooser(shareIntent, getString(R.string.share)))
     }
 
     private fun rotateCurrent() {
