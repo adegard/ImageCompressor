@@ -30,10 +30,6 @@
             android:exported="false" />
 
         <activity
-            android:name=".GalleryActivity"
-            android:exported="false" />
-
-        <activity
             android:name=".FullScreenImageActivity"
             android:exported="false" />
 
