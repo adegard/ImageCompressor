@@ -39,12 +39,12 @@ class MainActivity : AppCompatActivity() {
 
         val adapter = GalleryAdapter(
             onFolderClick = { folder ->
-                if (adapter.isSelectionMode) return@GalleryAdapter
+                if ((binding.rvGallery.adapter as? GalleryAdapter)?.isSelectionMode == true) return@GalleryAdapter
                 pathStack.add(PathEntry(folder.treeUri, folder.documentId, folder.name))
                 loadCurrentLevel()
             },
             onImageClick = { index ->
-                if (adapter.isSelectionMode) return@GalleryAdapter
+                if ((binding.rvGallery.adapter as? GalleryAdapter)?.isSelectionMode == true) return@GalleryAdapter
                 openFullScreen(index)
             },
             onFolderLongClick = { folder ->
