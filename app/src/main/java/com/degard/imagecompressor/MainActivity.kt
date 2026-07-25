@@ -170,11 +170,22 @@ class MainActivity : AppCompatActivity() {
         val images = mutableListOf<GalleryAdapter.ImageEntry>()
         var imgIndex = 0
         entries.filter { !it.isDirectory }.forEach {
-            val hasTag = TagManager.hasTag(this, Uri.parse(it.uri))
-            images.add(GalleryAdapter.ImageEntry(Uri.parse(it.uri), it.name, imgIndex++, hasTag))
+            images.add(GalleryAdapter.ImageEntry(Uri.parse(it.uri), it.name, imgIndex++, hasTag = false))
         }
 
         adapter.submitData(folders, images)
+
+        Thread {
+            val tagMap = mutableMapOf<Int, Boolean>()
+            for (img in images) {
+                tagMap[img.index] = TagManager.hasTag(this, img.uri)
+            }
+            runOnUiThread {
+                for ((idx, hasTag) in tagMap) {
+                    adapter.updateHasTag(idx, hasTag)
+                }
+            }
+        }.start()
     }
 
     private fun queryChildren(treeUri: Uri, parentDocId: String): List<FolderCache.CachedEntry> {
