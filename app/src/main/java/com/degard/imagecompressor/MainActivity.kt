@@ -25,22 +25,26 @@ class MainActivity : AppCompatActivity() {
 
         binding.toolbar.title = getString(R.string.gallery_title)
         binding.rvGallery.layoutManager = GridLayoutManager(this, 3)
-        binding.rvGallery.adapter = GalleryAdapter(emptyList(), emptyList()) { entry ->
-            when (entry) {
-                is GalleryAdapter.FolderEntry -> {
-                    pathStack.add(PathEntry(entry.uri, entry.name))
-                    loadCurrentLevel()
-                }
-                is GalleryAdapter.ImageEntry -> openFullScreen(entry)
-            }
-        }
 
-        binding.btnUp.setOnClickListener { goUp() }
+        val adapter = GalleryAdapter(
+            onFolderClick = { folder ->
+                pathStack.add(PathEntry(folder.uri, folder.name))
+                loadCurrentLevel()
+            },
+            onImageClick = { index ->
+                openFullScreen(index)
+            }
+        )
+        binding.rvGallery.adapter = adapter
+
+        binding.toolbar.setNavigationOnClickListener { goUp() }
 
         val savedUri = Prefs(this).galleryRootUri
         if (savedUri != null) {
             pathStack.add(PathEntry(savedUri, getString(R.string.gallery_title)))
             loadCurrentLevel()
+        } else {
+            showEmptyState(true)
         }
     }
 
@@ -55,13 +59,19 @@ class MainActivity : AppCompatActivity() {
     private fun loadCurrentLevel() {
         val entry = pathStack.last()
         binding.toolbar.title = entry.title
-        binding.btnUp.visibility = if (pathStack.size > 1) View.VISIBLE else View.GONE
+        binding.toolbar.navigationIcon = if (pathStack.size > 1) {
+            androidx.appcompat.content.res.AppCompatResources.getDrawable(this, androidx.appcompat.R.drawable.abc_ic_ab_back_material)
+        } else {
+            null
+        }
+
+        showEmptyState(false)
 
         val cached = FolderCache.get(entry.uri)
         if (cached != null) {
             displayEntries(cached)
         } else {
-            showLoading(true)
+            binding.progressBar.visibility = View.VISIBLE
         }
 
         Thread {
@@ -69,14 +79,15 @@ class MainActivity : AppCompatActivity() {
                 val children = queryChildren(entry.uri)
                 FolderCache.put(entry.uri, children)
                 runOnUiThread {
-                    showLoading(false)
+                    binding.progressBar.visibility = View.GONE
                     displayEntries(children)
+                    if (children.isEmpty()) showEmptyState(true)
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    showLoading(false)
+                    binding.progressBar.visibility = View.GONE
                     if (cached == null) {
-                        showError(e)
+                        showEmptyState(true)
                     }
                 }
             }
@@ -92,9 +103,7 @@ class MainActivity : AppCompatActivity() {
             images.add(GalleryAdapter.ImageEntry(Uri.parse(it.uri), it.name, imgIndex++))
         }
 
-        binding.emptyText.visibility = if (folders.isEmpty() && images.isEmpty()) View.VISIBLE else View.GONE
-
-        (binding.rvGallery.adapter as GalleryAdapter).update(folders, images)
+        (binding.rvGallery.adapter as GalleryAdapter).submitData(folders, images)
     }
 
     private fun queryChildren(parentUri: Uri): List<FolderCache.CachedEntry> {
@@ -185,12 +194,12 @@ class MainActivity : AppCompatActivity() {
         return count
     }
 
-    private fun openFullScreen(entry: GalleryAdapter.ImageEntry) {
+    private fun openFullScreen(index: Int) {
         val adapter = binding.rvGallery.adapter as GalleryAdapter
-        val imageUris = adapter.images.map { it.uri.toString() }.toTypedArray()
+        val imageUris = adapter.getImages().map { it.uri.toString() }.toTypedArray()
         val intent = android.content.Intent(this, FullScreenImageActivity::class.java).apply {
             putExtra("uris", imageUris)
-            putExtra("position", entry.position)
+            putExtra("position", index)
         }
         startActivity(intent)
     }
@@ -202,12 +211,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showLoading(show: Boolean) {
-        binding.progressBar.visibility = if (show) View.VISIBLE else View.GONE
-    }
-
-    private fun showError(e: Exception) {
-        binding.emptyText.text = "${getString(R.string.error_access)}\n${e.message}"
-        binding.emptyText.visibility = View.VISIBLE
+    private fun showEmptyState(show: Boolean) {
+        binding.emptyState.visibility = if (show) View.VISIBLE else View.GONE
     }
 }
