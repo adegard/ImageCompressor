@@ -38,6 +38,16 @@ class MainActivity : AppCompatActivity() {
         binding.rvGallery.adapter = adapter
 
         binding.toolbar.setNavigationOnClickListener { goUp() }
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.action_settings) {
+                startActivity(android.content.Intent(this, SettingsActivity::class.java))
+                true
+            } else false
+        }
+
+        binding.btnOpenSettings.setOnClickListener {
+            startActivity(android.content.Intent(this, SettingsActivity::class.java))
+        }
 
         val savedUri = Prefs(this).galleryRootUri
         if (savedUri != null) {
@@ -53,6 +63,12 @@ class MainActivity : AppCompatActivity() {
         if (pathStack.isNotEmpty()) {
             FolderCache.invalidate(pathStack.last().uri)
             loadCurrentLevel()
+        } else {
+            val savedUri = Prefs(this).galleryRootUri
+            if (savedUri != null) {
+                pathStack.add(PathEntry(savedUri, getString(R.string.gallery_title)))
+                loadCurrentLevel()
+            }
         }
     }
 
