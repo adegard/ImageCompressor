@@ -1,6 +1,7 @@
 package com.degard.imagecompressor
 
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -32,6 +33,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.rvGallery.layoutManager = GridLayoutManager(this, 3)
         binding.rvGallery.adapter = adapter
+
+        binding.toolbar.overflowIcon?.setTint(
+            MaterialColors.getColor(this, com.google.android.material.R.attr.colorControlNormal, Color.BLACK)
+        )
 
         binding.toolbar.setOnMenuItemClickListener { item ->
             if (item.itemId == R.id.action_settings) {

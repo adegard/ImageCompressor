@@ -12,32 +12,42 @@ A typical camera roll of **10 GB** can be reduced to around **1 GB** using WebP 
 
 ## Features
 
+### Photo Viewer (Main Screen)
+- Browse any folder on your device as a photo gallery
+- Navigate subfolders with a visual breadcrumb bar
+- Folder image counts shown at a glance
+- Full-screen image viewer with swipe between photos
+- **Delete** photos directly from the viewer (with confirmation)
+- **Rotate** photos 90° (rotation is saved to file)
+- Folder listing cached for instant navigation on revisits
+- Dark mode support
+
+### Photo Compressor (Settings Screen)
 - Converts JPG/JPEG and PNG files to WebP format
-- PNG images are compressed losslessly
 - JPG images compressed with configurable quality (default 65)
 - Max resolution cap (default 1280px) to resize oversized photos
 - Preserves EXIF rotation data
-- Skips files already in WebP format
 - Skips files already compressed (idempotent)
 - Deletes originals only after successful compression
-- Moves compressed files from a temp folder to a final destination
+- Temp files stored in app-internal cache (hidden from file managers)
 - Runs as a foreground service with notification (won't be killed mid-compression)
-- Remembers your folder settings between sessions
+- Remembers all folder settings between sessions
 
 ## How it works
 
-1. **Select three folders** using Android's folder picker:
-   - **Source** — folder containing photos to compress, tipically camera folder (e.g. `DCIM/Camera`)
-   - **Temp** — where compressed WebP files are written first (just create one somewhere)
-   - **Final** — where files are moved after successful compression (your compressed gallery folder)
+1. **Set a gallery root folder** — choose any folder to browse as a photo gallery (this is the main screen)
 
-2. **Adjust settings** (optional):
+2. **In Settings, select compression folders:**
+   - **Source** — folder containing photos to compress, typically camera folder (e.g. `DCIM/Camera`)
+   - **Final** — where compressed files are moved after successful compression
+
+3. **Adjust settings** (optional):
    - Quality: 1–100 (default 65 — good balance of size and quality)
    - Max resolution: largest dimension in pixels (default 1280)
 
-3. **Tap Start** — the app processes all images in the background, showing progress in a notification.
+4. **Tap Start** — the app processes all images in the background, showing progress in a notification.
 
-4. **Originals are deleted** only after the compressed file is successfully written, so you never lose photos.
+5. **Originals are deleted** only after the compressed file is successfully written, so you never lose photos.
 
 ## Install
 
@@ -46,18 +56,6 @@ Download the latest APK from the [Releases](https://github.com/adegard/ImageComp
 ### Permissions
 
 The app needs access to your photo folders. When you tap "Select", Android will ask you to grant access to that directory. This is normal — the app uses Android's Storage Access Framework (SAF) and never reads anything outside the folders you choose.
-
-## Recommended Gallery App
-
-For browsing WebP files from your compressed folder on Android, use **Gallery** from [Simple Mobile Tools](https://github.com/SimpleMobileTools/Simple-Gallery)
-
-- Open source (Simple Mobile Tools)
-- Full WebP support
-- No ads, no tracking, no subscriptions
-- Clean Material Design interface
-
-Install from github
-https://github.com/SimpleMobileTools/Simple-Gallery
 
 ## License
 
