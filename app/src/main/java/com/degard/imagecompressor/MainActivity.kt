@@ -79,6 +79,10 @@ class MainActivity : AppCompatActivity() {
             showBatchTagDialog()
         }
 
+        binding.btnDeleteSelected.setOnClickListener {
+            confirmBatchDelete()
+        }
+
         binding.btnOpenSettings.setOnClickListener {
             startActivity(android.content.Intent(this, SettingsActivity::class.java))
         }
@@ -258,6 +262,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun showEmptyState(show: Boolean) {
         binding.emptyState.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
+    private fun confirmBatchDelete() {
+        val adapter = binding.rvGallery.adapter as GalleryAdapter
+        val selectedUris = adapter.getSelectedUris()
+        if (selectedUris.isEmpty()) return
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.confirm_delete_title)
+            .setMessage("Delete ${selectedUris.size} photo(s) permanently?")
+            .setPositiveButton(R.string.delete) { _, _ ->
+                for (uri in selectedUris) {
+                    androidx.documentfile.provider.DocumentFile.fromSingleUri(this, uri)?.delete()
+                }
+                adapter.exitSelectionMode()
+                loadCurrentLevel()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun showBatchTagDialog() {
