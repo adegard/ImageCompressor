@@ -15,7 +15,11 @@ class MainActivity : AppCompatActivity() {
     private val pathStack = mutableListOf<PathEntry>()
     @Volatile private var loadGeneration = 0
 
-    data class PathEntry(val uri: Uri, val title: String)
+    data class PathEntry(
+        val treeUri: Uri,
+        val documentId: String,
+        val title: String
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,7 +33,7 @@ class MainActivity : AppCompatActivity() {
 
         val adapter = GalleryAdapter(
             onFolderClick = { folder ->
-                pathStack.add(PathEntry(folder.uri, folder.name))
+                pathStack.add(PathEntry(folder.treeUri, folder.documentId, folder.name))
                 loadCurrentLevel()
             },
             onImageClick = { index ->
@@ -52,7 +56,8 @@ class MainActivity : AppCompatActivity() {
 
         val savedUri = Prefs(this).galleryRootUri
         if (savedUri != null) {
-            pathStack.add(PathEntry(savedUri, getString(R.string.gallery_title)))
+            val rootDocId = DocumentsContract.getTreeDocumentId(savedUri)
+            pathStack.add(PathEntry(savedUri, rootDocId, getString(R.string.gallery_title)))
             loadCurrentLevel()
         } else {
             showEmptyState(true)
@@ -62,12 +67,13 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (pathStack.isNotEmpty()) {
-            FolderCache.invalidate(pathStack.last().uri)
+            FolderCache.invalidate(pathStack.last().key())
             loadCurrentLevel()
         } else {
             val savedUri = Prefs(this).galleryRootUri
             if (savedUri != null) {
-                pathStack.add(PathEntry(savedUri, getString(R.string.gallery_title)))
+                val rootDocId = DocumentsContract.getTreeDocumentId(savedUri)
+                pathStack.add(PathEntry(savedUri, rootDocId, getString(R.string.gallery_title)))
                 loadCurrentLevel()
             }
         }
@@ -85,9 +91,10 @@ class MainActivity : AppCompatActivity() {
         showEmptyState(false)
         binding.progressBar.visibility = View.GONE
 
-        val cached = FolderCache.get(entry.uri)
+        val cacheKey = entry.key()
+        val cached = FolderCache.get(cacheKey)
         if (cached != null) {
-            displayEntries(cached)
+            displayEntries(cached, entry)
         } else {
             binding.progressBar.visibility = View.VISIBLE
         }
@@ -95,13 +102,13 @@ class MainActivity : AppCompatActivity() {
         val gen = ++loadGeneration
         Thread {
             try {
-                val children = queryChildren(entry.uri)
+                val children = queryChildren(entry.treeUri, entry.documentId)
                 if (gen != loadGeneration) return@Thread
-                FolderCache.put(entry.uri, children)
+                FolderCache.put(cacheKey, children)
                 runOnUiThread {
                     if (gen == loadGeneration) {
                         binding.progressBar.visibility = View.GONE
-                        displayEntries(children)
+                        displayEntries(children, entry)
                         if (children.isEmpty()) showEmptyState(true)
                     }
                 }
@@ -116,9 +123,15 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun displayEntries(entries: List<FolderCache.CachedEntry>) {
-        val folders = entries.filter { it.isDirectory }
-            .map { GalleryAdapter.FolderEntry(it.name, Uri.parse(it.uri), it.imageCount) }
+    private fun displayEntries(entries: List<FolderCache.CachedEntry>, parent: PathEntry) {
+        val folders = entries.filter { it.isDirectory }.map {
+            GalleryAdapter.FolderEntry(
+                name = it.name,
+                treeUri = parent.treeUri,
+                documentId = it.docId,
+                childCount = it.imageCount
+            )
+        }
         val images = mutableListOf<GalleryAdapter.ImageEntry>()
         var imgIndex = 0
         entries.filter { !it.isDirectory }.forEach {
@@ -128,10 +141,9 @@ class MainActivity : AppCompatActivity() {
         (binding.rvGallery.adapter as GalleryAdapter).submitData(folders, images)
     }
 
-    private fun queryChildren(parentUri: Uri): List<FolderCache.CachedEntry> {
+    private fun queryChildren(treeUri: Uri, parentDocId: String): List<FolderCache.CachedEntry> {
         val resolver = contentResolver
-        val treeId = DocumentsContract.getTreeDocumentId(parentUri)
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, treeId)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
 
         val entries = mutableListOf<FolderCache.CachedEntry>()
         val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "heic", "heif")
@@ -154,7 +166,7 @@ class MainActivity : AppCompatActivity() {
                 val mime = cursor.getString(2) ?: ""
                 val isDir = DocumentsContract.Document.MIME_TYPE_DIR == mime
 
-                val childUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
+                val childUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
 
                 val imageCount = if (!isDir) {
                     val ext = name.substringAfterLast('.', "").lowercase()
@@ -165,6 +177,7 @@ class MainActivity : AppCompatActivity() {
                     FolderCache.CachedEntry(
                         name = name,
                         uri = childUri.toString(),
+                        docId = docId,
                         isDirectory = isDir,
                         imageCount = imageCount
                     )
@@ -199,4 +212,6 @@ class MainActivity : AppCompatActivity() {
     private fun showEmptyState(show: Boolean) {
         binding.emptyState.visibility = if (show) View.VISIBLE else View.GONE
     }
+
+    private fun PathEntry.key(): String = "${treeUri}|${documentId}"
 }

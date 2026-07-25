@@ -8,6 +8,7 @@ object FolderCache {
     data class CachedEntry(
         val name: String,
         val uri: String,
+        val docId: String = "",
         val isDirectory: Boolean,
         val imageCount: Int = 0
     )
@@ -18,14 +19,14 @@ object FolderCache {
         if (db == null) db = GalleryDb(context.applicationContext)
     }
 
-    fun get(uri: Uri): List<CachedEntry>? = db?.getEntries(uri.toString())
+    fun get(key: String): List<CachedEntry>? = db?.getEntries(key)
 
-    fun put(uri: Uri, entries: List<CachedEntry>) {
-        db?.putEntries(uri.toString(), entries)
+    fun put(key: String, entries: List<CachedEntry>) {
+        db?.putEntries(key, entries)
     }
 
-    fun invalidate(uri: Uri) {
-        db?.invalidate(uri.toString())
+    fun invalidate(key: String) {
+        db?.invalidate(key)
     }
 
     fun invalidateAll() {

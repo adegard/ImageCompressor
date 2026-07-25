@@ -5,8 +5,6 @@ import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.degard.imagecompressor.databinding.GalleryFolderItemBinding
 import com.degard.imagecompressor.databinding.GalleryItemBinding
@@ -21,7 +19,7 @@ class GalleryAdapter(
         const val TYPE_IMAGE = 1
     }
 
-    data class FolderEntry(val name: String, val uri: Uri, val childCount: Int)
+    data class FolderEntry(val name: String, val treeUri: Uri, val documentId: String, val childCount: Int)
     data class ImageEntry(val uri: Uri, val name: String, val index: Int)
 
     private val items = mutableListOf<Any>()
@@ -34,14 +32,6 @@ class GalleryAdapter(
     }
 
     fun getImages(): List<ImageEntry> = items.filterIsInstance<ImageEntry>()
-
-    fun removeImage(imageUri: Uri) {
-        val idx = items.indexOfFirst { it is ImageEntry && it.uri == imageUri }
-        if (idx >= 0) {
-            items.removeAt(idx)
-            notifyItemRemoved(idx)
-        }
-    }
 
     override fun getItemViewType(position: Int): Int =
         if (items[position] is FolderEntry) TYPE_FOLDER else TYPE_IMAGE
