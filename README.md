@@ -1,3 +1,5 @@
+[![Buy me a coffee](https://cdn.buymeacoffee.com/buttons/v2/default-red.png)](https://www.buymeacoffee.com/adegard)
+
 # Image Compressor
 
 Compress JPG/PNG photos to WebP on your Android device — no cloud, no subscription, no internet needed.
