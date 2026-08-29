@@ -16,6 +16,12 @@ A 10 GB camera roll can shrink to ~1 GB with virtually no visible quality loss.
 - **Safe** — originals deleted only after successful compression
 - **Background service** — runs with notification, survives app switching
 
+## Screenshots
+
+| | |
+| --- | --- |
+| <img src="Screenshot_20260829-104105.png" width="300" alt="Gallery browser"> | <img src="Screenshot_20260829-104021.png" width="300" alt="Compression settings"> |
+
 ## How to use
 
 1. Set a **gallery root folder** to browse your photos
