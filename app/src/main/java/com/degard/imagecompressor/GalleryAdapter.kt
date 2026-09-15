@@ -1,6 +1,5 @@
 package com.degard.imagecompressor
 
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
@@ -144,10 +143,7 @@ class GalleryAdapter(
             val ctx = itemView.context
             Thread {
                 try {
-                    val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
-                    val bitmap = ctx.contentResolver.openInputStream(entry.uri)?.use {
-                        BitmapFactory.decodeStream(it, null, opts)
-                    }
+                    val bitmap = ImageUtil.decodeRotated(ctx, entry.uri, 4)
                     itemView.post {
                         if (b.ivThumb.tag == entry.uri) {
                             b.ivThumb.setImageBitmap(bitmap)

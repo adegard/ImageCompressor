@@ -9,27 +9,18 @@ object TagManager {
     private const val SEPARATOR = "; "
 
     fun getTags(context: Context, uri: Uri): List<String> {
-        return try {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                val exif = ExifInterface(stream)
-                val raw = exif.getAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION) ?: return emptyList()
-                raw.split(SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
-            } ?: emptyList()
-        } catch (_: Exception) {
-            emptyList()
-        }
+        val db = FolderCache.getDb() ?: return readExifTags(context, uri)
+        val cached = db.getImageTags(uri.toString())
+        if (cached != null) return cached
+
+        val fromExif = readExifTags(context, uri)
+        db.setImageTags(uri.toString(), fromExif)
+        return fromExif
     }
 
     fun setTags(context: Context, uri: Uri, tags: List<String>) {
-        try {
-            val fd = context.contentResolver.openFileDescriptor(uri, "rw") ?: return
-            fd.use {
-                val exif = ExifInterface(it.fileDescriptor)
-                val value = tags.joinToString(SEPARATOR)
-                exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, if (value.isEmpty()) null else value)
-                exif.saveAttributes()
-            }
-        } catch (_: Exception) {}
+        FolderCache.getDb()?.setImageTags(uri.toString(), tags)
+        writeExifTags(context, uri, tags)
     }
 
     fun addTag(context: Context, uri: Uri, tag: String) {
@@ -50,6 +41,31 @@ object TagManager {
         return getTags(context, uri).isNotEmpty()
     }
 
+    fun getTagMap(context: Context, uris: List<Uri>): Map<Uri, List<String>> {
+        val result = mutableMapOf<Uri, List<String>>()
+        val db = FolderCache.getDb() ?: return emptyMap()
+
+        val cached = db.getImageTagMap(uris.map { it.toString() })
+        val missing = mutableListOf<Uri>()
+        for (uri in uris) {
+            val tags = cached[uri.toString()]
+            if (tags != null) {
+                result[uri] = tags
+            } else {
+                missing.add(uri)
+            }
+        }
+
+        if (missing.isNotEmpty()) {
+            for (uri in missing) {
+                val exif = readExifTags(context, uri)
+                db.setImageTags(uri.toString(), exif)
+                result[uri] = exif
+            }
+        }
+        return result
+    }
+
     fun getFolderTag(context: Context, folderKey: String): String? {
         return FolderCache.getDb()?.getFolderTag(folderKey)
     }
@@ -64,5 +80,29 @@ object TagManager {
             allTags.addAll(getTags(context, uri))
         }
         return allTags.sorted()
+    }
+
+    private fun readExifTags(context: Context, uri: Uri): List<String> {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val exif = ExifInterface(stream)
+                val raw = exif.getAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION) ?: return emptyList()
+                raw.split(SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
+            } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun writeExifTags(context: Context, uri: Uri, tags: List<String>) {
+        try {
+            val fd = context.contentResolver.openFileDescriptor(uri, "rw") ?: return
+            fd.use {
+                val exif = ExifInterface(it.fileDescriptor)
+                val value = tags.joinToString(SEPARATOR)
+                exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, if (value.isEmpty()) null else value)
+                exif.saveAttributes()
+            }
+        } catch (_: Exception) {}
     }
 }

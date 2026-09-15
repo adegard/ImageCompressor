@@ -4,7 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db", null, 3) {
+class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db", null, 4) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -24,6 +24,12 @@ class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db"
                 tag TEXT NOT NULL
             )"""
         )
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS image_tags (
+                uri TEXT PRIMARY KEY,
+                tags TEXT NOT NULL
+            )"""
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -33,6 +39,14 @@ class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db"
                 """CREATE TABLE IF NOT EXISTS folder_annotations (
                     folder_key TEXT PRIMARY KEY,
                     tag TEXT NOT NULL
+                )"""
+            )
+        }
+        if (oldVersion < 4) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS image_tags (
+                    uri TEXT PRIMARY KEY,
+                    tags TEXT NOT NULL
                 )"""
             )
         }
@@ -131,4 +145,72 @@ class GalleryDb(context: Context) : SQLiteOpenHelper(context, "gallery_cache.db"
         }
         return tags.distinct().sorted()
     }
+
+    fun getImageTags(uri: String): List<String>? {
+        readableDatabase.query(
+            "image_tags",
+            arrayOf("tags"),
+            "uri = ?",
+            arrayOf(uri),
+            null, null, null
+        ).use { cursor ->
+            if (cursor.moveToFirst()) return splitTags(cursor.getString(0))
+        }
+        return null
+    }
+
+    fun setImageTags(uri: String, tags: List<String>) {
+        val value = tags.joinToString("; ")
+        if (value.isEmpty()) {
+            writableDatabase.delete("image_tags", "uri = ?", arrayOf(uri))
+        } else {
+            writableDatabase.execSQL(
+                "INSERT OR REPLACE INTO image_tags (uri, tags) VALUES (?, ?)",
+                arrayOf(uri, value)
+            )
+        }
+    }
+
+    fun getImageTagMap(uris: List<String>): Map<String, List<String>> {
+        if (uris.isEmpty()) return emptyMap()
+        val result = mutableMapOf<String, List<String>>()
+        val unique = uris.distinct()
+        unique.chunked(500).forEach { chunk ->
+            val placeholders = chunk.joinToString(",") { "?" }
+            readableDatabase.query(
+                "image_tags",
+                arrayOf("uri", "tags"),
+                "uri IN ($placeholders)",
+                chunk.toTypedArray(),
+                null, null, null
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    result[cursor.getString(0)] = splitTags(cursor.getString(1))
+                }
+            }
+        }
+        return result
+    }
+
+    fun deleteImageTag(uri: String) {
+        writableDatabase.delete("image_tags", "uri = ?", arrayOf(uri))
+    }
+
+    fun deleteImageTags(uris: List<String>) {
+        if (uris.isEmpty()) return
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            uris.distinct().chunked(500).forEach { chunk ->
+                val placeholders = chunk.joinToString(",") { "?" }
+                db.delete("image_tags", "uri IN ($placeholders)", chunk.toTypedArray())
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    private fun splitTags(raw: String): List<String> =
+        raw.split("; ").map { it.trim() }.filter { it.isNotEmpty() }
 }

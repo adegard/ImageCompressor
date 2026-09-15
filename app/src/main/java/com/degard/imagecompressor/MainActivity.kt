@@ -180,13 +180,10 @@ class MainActivity : AppCompatActivity() {
         adapter.submitData(folders, images)
 
         Thread {
-            val tagMap = mutableMapOf<Int, Boolean>()
-            for (img in images) {
-                tagMap[img.index] = TagManager.hasTag(this, img.uri)
-            }
+            val tagMap = TagManager.getTagMap(this, images.map { it.uri })
             runOnUiThread {
-                for ((idx, hasTag) in tagMap) {
-                    adapter.updateHasTag(idx, hasTag)
+                for (img in images) {
+                    adapter.updateHasTag(img.index, tagMap[img.uri].isNullOrEmpty().not())
                 }
             }
         }.start()
@@ -276,6 +273,7 @@ class MainActivity : AppCompatActivity() {
                 for (uri in selectedUris) {
                     androidx.documentfile.provider.DocumentFile.fromSingleUri(this, uri)?.delete()
                 }
+                FolderCache.getDb()?.deleteImageTags(selectedUris.map { it.toString() })
                 adapter.exitSelectionMode()
                 loadCurrentLevel()
             }

@@ -36,6 +36,8 @@ object ImageCompressor {
         var errors = 0
         var skipped = 0
 
+        val tagMap = mutableMapOf<String, List<String>>()
+
         fun walkDir(dir: DocumentFile) {
             dir.listFiles().forEach { file ->
                 if (file.isDirectory) {
@@ -69,6 +71,11 @@ object ImageCompressor {
                     }
                     bitmap.recycle()
 
+                    val tags = TagManager.getTags(context, file.uri)
+                    if (tags.isNotEmpty()) {
+                        tagMap[outFile.absolutePath] = tags
+                    }
+
                     file.delete()
                     compressed++
                 } catch (e: Exception) {
@@ -81,16 +88,16 @@ object ImageCompressor {
         walkDir(srcDoc)
 
         onProgress("Moving to final folder…")
-        moveFiles(context, tmpDir, finalDoc)
+        moveFiles(context, tmpDir, finalDoc, tagMap)
 
         return Result(compressed, errors, skipped)
     }
 
-    private fun moveFiles(context: Context, src: File, dst: DocumentFile) {
+    private fun moveFiles(context: Context, src: File, dst: DocumentFile, tagMap: Map<String, List<String>>) {
         src.listFiles().forEach { file ->
             if (file.isDirectory) {
                 val subDir = dst.createDirectory(file.name) ?: return@forEach
-                moveFiles(context, file, subDir)
+                moveFiles(context, file, subDir, tagMap)
                 return@forEach
             }
 
@@ -100,6 +107,12 @@ object ImageCompressor {
             context.contentResolver.openOutputStream(newFile.uri)?.use { output ->
                 file.inputStream().use { input -> input.copyTo(output) }
             }
+
+            val tags = tagMap[file.absolutePath]
+            if (!tags.isNullOrEmpty()) {
+                TagManager.setTags(context, newFile.uri, tags)
+            }
+
             file.delete()
         }
     }
