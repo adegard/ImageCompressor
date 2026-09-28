@@ -34,7 +34,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private val pickGalleryRoot = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let {
-            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             prefs.galleryRootUri = it
             updateUI()
         }

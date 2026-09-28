@@ -23,6 +23,8 @@
     <string name="gallery_subfolder_count">%d photos</string>
     <string name="gallery_folder">Folder</string>
     <string name="rotate">Rotate</string>
+    <string name="rotate_failed">Could not save rotation to this file</string>
+    <string name="rotate_no_permission">No write access to this folder.\nRe-select the gallery root folder in Settings.</string>
     <string name="delete">Delete</string>
     <string name="confirm_delete_title">Delete photo</string>
     <string name="confirm_delete_msg">Delete this photo permanently?</string>

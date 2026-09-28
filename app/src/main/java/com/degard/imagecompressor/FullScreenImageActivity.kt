@@ -2,6 +2,7 @@ package com.degard.imagecompressor
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.GestureDetector
@@ -13,9 +14,9 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
-import androidx.exifinterface.media.ExifInterface
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.degard.imagecompressor.databinding.ActivityFullscreenBinding
@@ -32,6 +33,9 @@ class FullScreenImageActivity : AppCompatActivity() {
     private val baseExif = mutableMapOf<Int, Int>()
     private val bitmapCache = mutableMapOf<Int, Bitmap>()
     private val displayedBitmap = mutableMapOf<Int, Bitmap>()
+    private val pendingSave = mutableMapOf<Uri, Int>()
+    private val writing = mutableMapOf<Uri, Int>()
+    private var shareAfterSave: Uri? = null
     private var barsVisible = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,15 +72,15 @@ class FullScreenImageActivity : AppCompatActivity() {
         setupTapToToggle()
     }
 
-    override fun onDestroy() {
-        val raws: MutableSet<Bitmap> = mutableSetOf()
-        raws.addAll(bitmapCache.values)
-        val toRecycle = mutableSetOf<Bitmap>()
-        toRecycle.addAll(raws)
-        for (b in displayedBitmap.values) {
-            if (b !in raws) toRecycle.add(b)
+    override fun onStop() {
+        super.onStop()
+        for (uri in pendingSave.keys.toList()) {
+            if (!writing.containsKey(uri)) startSave(uri)
         }
-        toRecycle.forEach { it.recycle() }
+    }
+
+    override fun onDestroy() {
+        clearBitmaps()
         super.onDestroy()
     }
 
@@ -207,12 +211,12 @@ class FullScreenImageActivity : AppCompatActivity() {
         val uri = uris[currentPosition]
         DocumentFile.fromSingleUri(this, uri)?.delete()
         FolderCache.getDb()?.deleteImageTag(uri.toString())
-        uris.removeAt(currentPosition)
-        rotations.remove(currentPosition)
-        baseExif.remove(currentPosition)
-        bitmapCache.clear()
-        displayedBitmap.values.forEach { it.recycle() }
-        displayedBitmap.clear()
+        val removed = currentPosition
+        uris.removeAt(removed)
+        pendingSave.remove(uri)
+        writing.remove(uri)
+        shiftPositions(removed)
+        clearBitmaps()
 
         if (uris.isEmpty()) {
             finish()
@@ -227,8 +231,26 @@ class FullScreenImageActivity : AppCompatActivity() {
         updateTagBadge()
     }
 
+    private fun shiftPositions(removed: Int) {
+        for (map in listOf(rotations, baseExif)) {
+            val stale = map.keys.filter { it > removed }
+            stale.forEach { map.remove(it) }
+            val moved = map.entries.map { (k, v) -> (k - 1) to v }
+            map.clear()
+            map.putAll(moved)
+        }
+    }
+
     private fun shareCurrent() {
-        val uri = uris[currentPosition]
+        val uri = uris.getOrNull(currentPosition) ?: return
+        if (writing.containsKey(uri)) {
+            shareAfterSave = uri
+            return
+        }
+        launchShare(uri)
+    }
+
+    private fun launchShare(uri: Uri) {
         val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "image/*"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
@@ -237,11 +259,91 @@ class FullScreenImageActivity : AppCompatActivity() {
         startActivity(android.content.Intent.createChooser(shareIntent, getString(R.string.share)))
     }
 
+    private fun effectiveRotation(position: Int): Int =
+        ((((baseExif[position] ?: 0) + (rotations[position] ?: 0)) % 360) + 360) % 360
+
     private fun rotateCurrent() {
-        val current = rotations[currentPosition] ?: 0
-        rotations[currentPosition] = (current + 90) % 360
-        val iv = pageImageView(currentPosition) ?: return
-        applyDisplayBitmap(iv, currentPosition)
+        val pos = currentPosition
+        val uri = uris.getOrNull(pos) ?: return
+        if (!canWrite(uri)) {
+            Toast.makeText(this, R.string.rotate_no_permission, Toast.LENGTH_LONG).show()
+            return
+        }
+        rotations[pos] = ((rotations[pos] ?: 0) + 90) % 360
+        pageImageView(pos)?.let { applyDisplayBitmap(it, pos) }
+        requestSave(uri, effectiveRotation(pos))
+    }
+
+    private fun canWrite(uri: Uri): Boolean = try {
+        contentResolver.openFileDescriptor(uri, "rw")?.use { true } ?: false
+    } catch (_: Throwable) {
+        false
+    }
+
+    private fun requestSave(uri: Uri, degrees: Int) {
+        pendingSave[uri] = ((degrees % 360) + 360) % 360
+        if (writing.containsKey(uri)) return
+        startSave(uri)
+    }
+
+    private fun startSave(uri: Uri) {
+        val deg = pendingSave[uri] ?: return
+        writing[uri] = deg
+        Thread {
+            val result = try {
+                val name = DocumentFile.fromSingleUri(this@FullScreenImageActivity, uri)?.name
+                if (name == null) {
+                    ImageUtil.RotationResult.FAILED
+                } else {
+                    ImageUtil.persistRotation(this@FullScreenImageActivity, uri, name, deg)
+                }
+            } catch (_: Throwable) {
+                ImageUtil.RotationResult.FAILED
+            }
+            runOnUiThread { onSaveFinished(uri, deg, result) }
+        }.start()
+    }
+
+    private fun onSaveFinished(uri: Uri, savedDegrees: Int, result: ImageUtil.RotationResult) {
+        writing.remove(uri)
+        if (isDestroyed) return
+
+        val pos = uris.indexOf(uri)
+        if (pos >= 0) {
+            when (result) {
+                ImageUtil.RotationResult.FAILED -> {
+                    rotations[pos] = 0
+                    pageImageView(pos)?.let { applyDisplayBitmap(it, pos) }
+                    Toast.makeText(this, R.string.rotate_failed, Toast.LENGTH_SHORT).show()
+                }
+                ImageUtil.RotationResult.EXIF_ONLY -> {
+                    baseExif[pos] = ImageUtil.readExifDegrees(this, uri)
+                    rotations[pos] = 0
+                    pageImageView(pos)?.let { applyDisplayBitmap(it, pos) }
+                    FolderCache.invalidateAll()
+                }
+                ImageUtil.RotationResult.REENCODED -> {
+                    baseExif[pos] = ImageUtil.readExifDegrees(this, uri)
+                    rotations[pos] = 0
+                    reloadPosition(pos)
+                    FolderCache.invalidateAll()
+                }
+            }
+        }
+
+        val queued = pendingSave[uri]
+        if (queued != null && queued != savedDegrees) {
+            startSave(uri)
+        } else {
+            pendingSave.remove(uri)
+        }
+
+        if (writing.isEmpty()) {
+            shareAfterSave?.let {
+                shareAfterSave = null
+                launchShare(it)
+            }
+        }
     }
 
     private fun pageImageView(position: Int): ImageView? {
@@ -257,95 +359,92 @@ class FullScreenImageActivity : AppCompatActivity() {
 
     private fun applyDisplayBitmap(iv: ImageView, position: Int) {
         val raw = bitmapCache[position] ?: return
-        val total = ((baseExif[position] ?: 0) + (rotations[position] ?: 0)) % 360
+        val total = effectiveRotation(position)
         val shown = if (total == 0) raw else ImageUtil.rotate(raw, total, recycleSource = false)
 
         val prev = displayedBitmap[position]
-        if (prev != null && prev !== shown && prev !== raw) prev.recycle()
         displayedBitmap[position] = shown
         iv.setImageBitmap(shown)
+
+        if (prev != null && prev !== shown && prev !== raw && !prev.isRecycled) {
+            iv.post {
+                val current = iv.drawable
+                if (current !is BitmapDrawable || current.bitmap !== prev) prev.recycle()
+            }
+        }
     }
 
-    private fun persistRotation(uri: Uri, degrees: Int) {
-        val doc = DocumentFile.fromSingleUri(this, uri) ?: return
-        val name = doc.name ?: return
-        val deg = ((degrees % 360) + 360) % 360
+    private fun reloadPosition(position: Int) {
+        val raw = bitmapCache.remove(position)
+        val shown = displayedBitmap.remove(position)
+        val iv = pageImageView(position)
+        iv?.setImageBitmap(null)
+        if (shown != null && shown !== raw && !shown.isRecycled) shown.recycle()
+        if (raw != null && !raw.isRecycled) raw.recycle()
+        if (iv != null) loadBitmap(position, iv)
+    }
 
-        if (ImageUtil.isJpeg(name)) {
-            if (writeExifOrientation(uri, deg)) return
-            if (deg == 0) return
-        } else if (deg == 0) {
+    private fun clearBitmaps() {
+        if (!::binding.isInitialized) {
+            bitmapCache.clear()
+            displayedBitmap.clear()
             return
         }
-        reencodeRotated(doc, name, deg)
-    }
-
-    private fun writeExifOrientation(uri: Uri, degrees: Int): Boolean {
-        return try {
-            val fd = contentResolver.openFileDescriptor(uri, "rw") ?: return false
-            fd.use {
-                val exif = ExifInterface(it.fileDescriptor)
-                exif.setAttribute(
-                    ExifInterface.TAG_ORIENTATION,
-                    ImageUtil.orientationForDegrees(degrees).toString()
-                )
-                exif.saveAttributes()
+        val rv = binding.viewPager.getChildAt(0) as? RecyclerView
+        if (rv != null) {
+            for (i in 0 until rv.childCount) {
+                rv.getChildAt(i).findViewById<ImageView>(R.id.ivFull)?.setImageDrawable(null)
             }
-            true
-        } catch (_: Exception) {
-            false
         }
+        val all = bitmapCache.values.toSet() + displayedBitmap.values
+        bitmapCache.clear()
+        displayedBitmap.clear()
+        for (b in all) if (!b.isRecycled) b.recycle()
     }
 
-    private fun reencodeRotated(doc: DocumentFile, name: String, degrees: Int) {
+    private fun loadBitmap(position: Int, iv: ImageView) {
+        val uri = uris.getOrNull(position) ?: return
+        iv.setImageBitmap(null)
+        iv.tag = uri
         Thread {
-            try {
-                val bitmap = ImageUtil.decodeRaw(this, doc.uri, 1) ?: return@Thread
-                val rotated = ImageUtil.rotate(bitmap, degrees)
-                val format = when {
-                    ImageUtil.isJpeg(name) -> Bitmap.CompressFormat.JPEG
-                    name.endsWith("png", ignoreCase = true) -> Bitmap.CompressFormat.PNG
-                    else -> Bitmap.CompressFormat.WEBP_LOSSY
-                }
-                val quality = if (format == Bitmap.CompressFormat.WEBP_LOSSY) 90 else 95
-                contentResolver.openOutputStream(doc.uri, "w")?.use { out ->
-                    rotated.compress(format, quality, out)
-                }
-                if (format == Bitmap.CompressFormat.JPEG) {
-                    writeExifOrientation(doc.uri, 0)
-                }
-                rotated.recycle()
-            } catch (_: Exception) {
+            val dm = resources.displayMetrics
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = calculateSampleSize(dm.widthPixels, dm.heightPixels)
             }
-            runOnUiThread { refreshAfterPersist() }
+            val raw = try {
+                contentResolver.openInputStream(uri)?.use {
+                    BitmapFactory.decodeStream(it, null, opts)
+                }
+            } catch (_: Throwable) {
+                null
+            }
+            val exifDeg = ImageUtil.readExifDegrees(this@FullScreenImageActivity, uri)
+            iv.post {
+                if (raw == null) return@post
+                if (iv.tag != uri || isDestroyed) {
+                    raw.recycle()
+                    return@post
+                }
+                val stale = bitmapCache.put(position, raw)
+                if (stale != null && stale !== displayedBitmap[position] && !stale.isRecycled) {
+                    stale.recycle()
+                }
+                baseExif[position] = exifDeg
+                applyDisplayBitmap(iv, position)
+            }
         }.start()
     }
 
-    private fun refreshAfterPersist() {
-        if (isDestroyed || isFinishing) return
-        rotations.clear()
-        baseExif.clear()
-        bitmapCache.clear()
-        displayedBitmap.values.forEach { it.recycle() }
-        displayedBitmap.clear()
-        binding.viewPager.adapter?.notifyDataSetChanged()
-        binding.viewPager.setCurrentItem(currentPosition, false)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        val pending = rotations.keys.filter { pos ->
-            pos < uris.size && (rotations[pos] ?: 0) % 360 != 0
+    private fun calculateSampleSize(screenW: Int, screenH: Int): Int {
+        var sample = 1
+        var w = screenW * 2
+        var h = screenH * 2
+        while (w > screenW * 3 || h > screenH * 3) {
+            w /= 2
+            h /= 2
+            sample *= 2
         }
-        if (pending.isEmpty()) return
-        for (pos in pending) {
-            val total = ((baseExif[pos] ?: ImageUtil.readExifDegrees(this, uris[pos])) + (rotations[pos] ?: 0)) % 360
-            rotations[pos] = 0
-            if (total % 360 != 0) {
-                persistRotation(uris[pos], total)
-            }
-        }
-        refreshAfterPersist()
+        return sample
     }
 
     inner class FullScreenPagerAdapter : RecyclerView.Adapter<FullScreenPagerAdapter.PageVH>() {
@@ -360,41 +459,7 @@ class FullScreenImageActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: PageVH, position: Int) {
             val iv = holder.itemView.findViewById<ImageView>(R.id.ivFull)
-            iv.setImageBitmap(null)
-            iv.tag = uris[position]
-            val uri = uris[position]
-
-            Thread {
-                val opts = BitmapFactory.Options().apply {
-                    val dm = resources.displayMetrics
-                    inSampleSize = calculateSampleSize(dm.widthPixels, dm.heightPixels)
-                }
-                val raw = contentResolver.openInputStream(uri)?.use {
-                    BitmapFactory.decodeStream(it, null, opts)
-                }
-                val exifDeg = ImageUtil.readExifDegrees(this@FullScreenImageActivity, uri)
-                holder.itemView.post {
-                    if (iv.tag == uri) {
-                        bitmapCache[position] = raw ?: return@post
-                        baseExif[position] = exifDeg
-                        applyDisplayBitmap(iv, position)
-                    } else {
-                        raw?.recycle()
-                    }
-                }
-            }.start()
-        }
-
-        private fun calculateSampleSize(screenW: Int, screenH: Int): Int {
-            var sample = 1
-            var w = screenW * 2
-            var h = screenH * 2
-            while (w > screenW * 3 || h > screenH * 3) {
-                w /= 2
-                h /= 2
-                sample *= 2
-            }
-            return sample
+            loadBitmap(position, iv)
         }
 
         inner class PageVH(view: View) : RecyclerView.ViewHolder(view)
