@@ -33,6 +33,9 @@ A 10 GB camera roll can shrink to ~1 GB with virtually no visible quality loss.
 
 Download the latest APK from [Releases](https://github.com/adegard/ImageCompressor/releases). Grant folder access when prompted — the app uses Android's SAF and only accesses folders you choose.
 
+Try online file compression:
+[webapp](https://adegard.github.io/ImageCompressor/)
+
 ## License
 
 MIT
